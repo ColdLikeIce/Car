@@ -4,7 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>8cd8b968-2ae2-4521-a284-01bc1b99ea3f</UserSecretsId>
+    <UserSecretsId>71858ed2-e9cf-422d-8816-bc486b252b8f</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
@@ -12,26 +12,25 @@
   <ItemGroup>
     <PackageReference Include="CommonCore" Version="1.0.3" />
     <PackageReference Include="Dapper" Version="2.1.35" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="6.0.31" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="6.0.30" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.1" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.6" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Common\" />
-    <Folder Include="Supplier\ABG\Models\Dbs\" />
-    <Folder Include="Supplier\ABG\Models\Dtos\" />
-    <Folder Include="Supplier\ABG\Models\RQs\" />
-    <Folder Include="Supplier\ABG\Models\RSs\" />
+    <Folder Include="Supplier\ABG\Dbs\" />
+    <Folder Include="Supplier\ABG\Dtos\" />
+    <Folder Include="Supplier\ABG\RQs\" />
+    <Folder Include="Supplier\ABG\RSs\" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="StandardInterface">
-      <HintPath>F:\GrabIntegration\project\Package\Car\StandardInterface.dll</HintPath>
+      <HintPath>J:\Code\package\Car\StandardInterface.dll</HintPath>
     </Reference>
     <Reference Include="XiWan.Car.BusinessShared">
-      <HintPath>F:\GrabIntegration\project\Package\Car\XiWan.Car.BusinessShared.dll</HintPath>
+      <HintPath>J:\Code\package\Car\XiWan.Car.BusinessShared.dll</HintPath>
     </Reference>
   </ItemGroup>
 

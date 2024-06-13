@@ -1,7 +1,7 @@
 ﻿using CommonCore.Dependency;
 using XiWan.Car.BusinessShared.Stds;
 
-namespace CarrentalWeb.Impl
+namespace HeyTripCarWeb.Share
 {
     public interface ICarSupplierApi : IScopedDependency
     {

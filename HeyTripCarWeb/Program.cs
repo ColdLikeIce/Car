@@ -1,9 +1,7 @@
-using CarrentalWeb.Config;
-using CarrentalWeb.Db;
-using CarrentalWeb.Impl;
 using CommonCore;
 using CommonCore.Dependency;
 using CommonCore.Enum;
+using HeyTripCarWeb.Share;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.OpenApi.Models;
@@ -38,17 +36,14 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.IncludeXmlComments(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml"));
 });
-builder.Services.Configure<AppSetting>(builder.Configuration.GetSection("AppSetting"));
+//builder.Services.Configure<AppSetting>(builder.Configuration.GetSection("AppSetting"));
 // 添加数据库连接
 string connectionString = builder.Configuration.GetConnectionString("DbConnection");
 builder.Services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
 
 // 添加数据访问层
-builder.Services.AddTransient(typeof(IRepository<>), typeof(DapperRepository<>));
-builder.Services.AddAutoIoc(typeof(IScopedDependency), LifeCycle.Scoped)
-       .AddAutoIoc(typeof(ISingletonDependency), LifeCycle.Singleton)
-       .AddAutoIoc(typeof(ITransientDependency), LifeCycle.Transient)
-       .AddMapper();
+//builder.Services.AddTransient(typeof(IRepository<>), typeof(DapperRepository<>));
+builder.Services.AddScopedDependencies(typeof(IScopedDependency), LifeCycle.Scoped).AddMapper(); ;
 
 var app = builder.Build();
 

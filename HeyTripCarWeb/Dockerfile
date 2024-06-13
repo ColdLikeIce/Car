@@ -8,17 +8,17 @@ EXPOSE 443
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["CarrentalWeb/CarrentalWeb.csproj", "CarrentalWeb/"]
-RUN dotnet restore "./CarrentalWeb/CarrentalWeb.csproj"
+COPY ["HeyTripCarWeb/HeyTripCarWeb.csproj", "HeyTripCarWeb/"]
+RUN dotnet restore "./HeyTripCarWeb/HeyTripCarWeb.csproj"
 COPY . .
-WORKDIR "/src/CarrentalWeb"
-RUN dotnet build "./CarrentalWeb.csproj" -c $BUILD_CONFIGURATION -o /app/build
+WORKDIR "/src/HeyTripCarWeb"
+RUN dotnet build "./HeyTripCarWeb.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./CarrentalWeb.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./HeyTripCarWeb.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "CarrentalWeb.dll"]
+ENTRYPOINT ["dotnet", "HeyTripCarWeb.dll"]

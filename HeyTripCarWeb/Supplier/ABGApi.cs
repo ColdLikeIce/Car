@@ -1,7 +1,7 @@
-﻿using CarrentalWeb.Impl;
+﻿using HeyTripCarWeb.Share;
 using XiWan.Car.BusinessShared.Stds;
 
-namespace CarrentalWeb.Supplier.ABG
+namespace HeyTripCarWeb.Supplier
 {
     public class ABGApi : ICarSupplierApi
     {
