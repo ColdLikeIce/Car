@@ -2,6 +2,7 @@ using CommonCore;
 using CommonCore.Dependency;
 using CommonCore.Enum;
 using HeyTripCarWeb.Share;
+using HeyTripCarWeb.Supplier.ABG.Config;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.OpenApi.Models;
@@ -36,14 +37,14 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.IncludeXmlComments(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml"));
 });
-//builder.Services.Configure<AppSetting>(builder.Configuration.GetSection("AppSetting"));
+builder.Services.Configure<ABGAppSetting>(builder.Configuration.GetSection("ABGAppSetting"));
 // 添加数据库连接
 string connectionString = builder.Configuration.GetConnectionString("DbConnection");
 builder.Services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
 
 // 添加数据访问层
 //builder.Services.AddTransient(typeof(IRepository<>), typeof(DapperRepository<>));
-builder.Services.AddScopedDependencies(typeof(IScopedDependency), LifeCycle.Scoped).AddMapper(); ;
+builder.Services.AddScopedDependencies(Assembly.GetExecutingAssembly()).AddMapper();
 
 var app = builder.Build();
 

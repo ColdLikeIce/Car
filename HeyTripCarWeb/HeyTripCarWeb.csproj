@@ -10,6 +10,25 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Supplier\ABG\Dbs\**" />
+    <Compile Remove="Supplier\ABG\Dtos\**" />
+    <Compile Remove="Supplier\ABG\RQs\**" />
+    <Compile Remove="Supplier\ABG\RSs\**" />
+    <Content Remove="Supplier\ABG\Dbs\**" />
+    <Content Remove="Supplier\ABG\Dtos\**" />
+    <Content Remove="Supplier\ABG\RQs\**" />
+    <Content Remove="Supplier\ABG\RSs\**" />
+    <EmbeddedResource Remove="Supplier\ABG\Dbs\**" />
+    <EmbeddedResource Remove="Supplier\ABG\Dtos\**" />
+    <EmbeddedResource Remove="Supplier\ABG\RQs\**" />
+    <EmbeddedResource Remove="Supplier\ABG\RSs\**" />
+    <None Remove="Supplier\ABG\Dbs\**" />
+    <None Remove="Supplier\ABG\Dtos\**" />
+    <None Remove="Supplier\ABG\RQs\**" />
+    <None Remove="Supplier\ABG\RSs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommonCore" Version="1.0.3" />
     <PackageReference Include="Dapper" Version="2.1.35" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="6.0.30" />
@@ -19,18 +38,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Supplier\ABG\Dbs\" />
-    <Folder Include="Supplier\ABG\Dtos\" />
-    <Folder Include="Supplier\ABG\RQs\" />
-    <Folder Include="Supplier\ABG\RSs\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="StandardInterface">
-      <HintPath>J:\Code\package\Car\StandardInterface.dll</HintPath>
+      <HintPath>F:\GrabIntegration\project\Package\Car\StandardInterface.dll</HintPath>
     </Reference>
     <Reference Include="XiWan.Car.BusinessShared">
-      <HintPath>J:\Code\package\Car\XiWan.Car.BusinessShared.dll</HintPath>
+      <HintPath>F:\GrabIntegration\project\Package\Car\XiWan.Car.BusinessShared.dll</HintPath>
     </Reference>
   </ItemGroup>
 

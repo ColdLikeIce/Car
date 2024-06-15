@@ -15,7 +15,7 @@ namespace HeyTripCarWeb.Controllers
             _carSupplierApi = carSupplierApi;
         }
 
-        [HttpGet(Name = "GetVehicles")]
+        [HttpPost("GetVehicles")]
         public async Task<string> GetVehiclesAsync([FromBody] StdGetVehiclesRQ dto)
         {
             await _carSupplierApi.GetVehiclesAsync(dto);
