@@ -1,16 +1,19 @@
-﻿using CommonCore.Mapper;
+﻿/*using CommonCore.Mapper;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using HeyTripCarWeb.Supplier.ABG.Models.RSs;
 using HeyTripCarWeb.Supplier.ABG.Util;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Serilog;
 using StackExchange.Redis;
+using System.Data;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Stds;
 
@@ -38,60 +41,12 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <returns></returns>
         public async Task<List<StdVehicle>> VehAvailRate(OTA_VehAvailRateRQ availRateRQ, int timeout = 45000)
         {
-            // 创建 SOAP 请求实例
-            var envelope = new CommonEnvelope
-            {
-                Header = new SOAP_ENV_Header
-                {
-                    Credentials = new Credentials
-                    {
-                        UserID = new EncodedString { Value = _setting.UserID, EncodingType = "xsd:string" },
-                        Password = new EncodedString { Value = _setting.Password, EncodingType = "xsd:string" }
-                    },
-                    WSBangRoadmap = new WSBang_Roadmap()
-                },
-                Body = new SOAP_ENV_Body
-                {
-                    Request = new ns_Request
-                    {
-                        OTA_VehAvailRateRQ = availRateRQ
-                    }
-                }
-            };
-
-            // Serialize the object to XML
-            // 序列化请求
-            XmlSerializer serializer = new XmlSerializer(typeof(CommonEnvelope));
-            string soapRequest;
-            using (StringWriter writer = new Utf8StringWriter())
-            {
-                // 使用 XmlWriterSettings 控制命名空间的定义
-                XmlWriterSettings settings = new XmlWriterSettings();
-                settings.OmitXmlDeclaration = true; // 忽略 XML 声明
-                settings.Indent = true;
-                settings.NewLineOnAttributes = false;
-
-                using (XmlWriter xmlWriter = XmlWriter.Create(writer, settings))
-                {
-                    // 添加命名空间声明
-                    XmlSerializerNamespaces namespaces = new XmlSerializerNamespaces();
-                    namespaces.Add("SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/");
-                    namespaces.Add("xsi", "http://www.w3.org/1999/XMLSchema-instance");
-                    namespaces.Add("xsd", "http://www.w3.org/1999/XMLSchema");
-                    namespaces.Add("ns", "http://wsg.avis.com/wsbang");
-
-                    // 序列化对象
-                    serializer.Serialize(xmlWriter, envelope, namespaces);
-                }
-
-                soapRequest = writer.ToString();
-            }
-            var res = ABGXmlHelper.PostRequest(_setting.Url, soapRequest);
+            var res = BuildEnvelope(new CommonRequest { OTA_VehAvailRateRQ = availRateRQ, Type = 1 });
             var model = ABGXmlHelper.GetResponse<OTA_VehAvailRateRS>(res);
-            /* if (!string.IsNullOrWhiteSpace(model.Errors?.Error?.ShortText))
+            *//* if (!string.IsNullOrWhiteSpace(model.Errors?.Error?.ShortText))
              {
                  throw new Exception(model.Errors.Error.ShortText);
-             }*/
+             }*//*
             if (model == null)
             {
             }
@@ -119,10 +74,31 @@ namespace HeyTripCarWeb.Supplier.ABG
                         //  5（中型）、6（中级）、7（标准）、8（全尺寸）、9（豪华）、10（高级）或11（小型货车）。
                         std.VehicleClass = (EnumCarVehicleClass)veCore.Vehicle.VehClass.Size;
                         std.AirConditioning = veCore.Vehicle.AirConditionInd;
-                        std.DriveType = EnumCarDriveType.None; //驱动类型是啥  usertodo
-                        //std.FuelType = //usertodo
+                        if (!string.IsNullOrWhiteSpace(veCore.Vehicle.DriveType))
+                        {
+                            Log.Information($"驱动类型{veCore.Vehicle.DriveType}");
+                            std.DriveType = EnumCarDriveType.None; //驱动类型是啥  usertodo
+                        }
+                        if (!string.IsNullOrWhiteSpace(veCore.Vehicle.FuelType))
+                        {
+                            Log.Information($"燃料类型{veCore.Vehicle.FuelType}");
+                            //std.FuelType = veCore.Vehicle.FuelType//usertodo
+                        }
+                        if (!string.IsNullOrWhiteSpace(veCore.Vehicle.PassengerQuantity))
+                        {
+                            Log.Information($"乘客数量{veCore.Vehicle.PassengerQuantity}");
+                            std.PassengerQuantity = Convert.ToInt32(veCore.Vehicle.PassengerQuantity);
+                        }
+                        if (veCore.Vehicle.BaggageQuantity > 0)
+                        {
+                            Log.Information($"行李数量{veCore.Vehicle.BaggageQuantity}");
+                            std.PassengerQuantity = veCore.Vehicle.BaggageQuantity;
+                        }
+                        std.PictureURL = veCore.Vehicle.PictureURL;
                         std.TransmissionType = veCore.Vehicle.TransmissionType == "Manual" ? EnumCarTransmissionType.Manual : EnumCarTransmissionType.Automatic;
-                        //std.FuelPolicy //usertodo
+
+                        *//*   std.MinDriverAge = 0; //userloss
+                           std.MaxDriverAge = 99; //userloss*//*
                         var rentalRate = veCore.RentalRate;
                         var rateDistance = rentalRate.RateDistance;
                         //里程限制
@@ -138,21 +114,201 @@ namespace HeyTripCarWeb.Supplier.ABG
                         //6额外距离收费6车辆登记费6以色列印花税7地方税7奥地利合同税7货物和服务税
                         //8额外里程/额外距离收费9额外10额外一周10天11小时13年龄附加费22预支付费用
                         //28可选费用
-                        var charges = rentalRate.VehicleCharges.VehicleCharge.Where(n => n.Purpose == "6").ToList();
-                        if (charges.Count > 0)
+                        if (rentalRate.RateDistance.Unlimited == false)
                         {
-                            Log.Information($"charges数量为{charges}");
-                            rateinfo.Currency = charges.FirstOrDefault().CurrencyCode;
-                            rateinfo.Amount = charges.FirstOrDefault().Amount;
-                            rateinfo.Description = charges.FirstOrDefault().Description;
+                            var charges = rentalRate.VehicleCharges.VehicleCharge.Where(n => n.Purpose == "6").ToList();
+                            if (charges.Count > 0)
+                            {
+                                Log.Information($"charges数量为{charges}");
+                                rateinfo.Currency = charges.FirstOrDefault().CurrencyCode;
+                                rateinfo.Amount = charges.FirstOrDefault().Amount;
+                                rateinfo.Description = charges.FirstOrDefault().Description;
+                            }
                         }
                         std.RateDistance = rateinfo;
+                        //价格
+
+                        std.TotalCharge = null;
+
+                        var fuelPolicy = rentalRate.VehicleCharges.VehicleCharge.Where(n => n.Description.Contains("FUEL POLICY")).ToList();
+                        if (fuelPolicy.Count > 0)
+                        {
+                            //燃油政策
+                            if (fuelPolicy.Exists(n => n.Description.Contains("Full To Full")))
+                            {
+                                std.FuelPolicy = EnumCarFuelPolicy.FullToFull;
+                            }
+                            else
+                            {
+                                Log.Information($"燃油政策:{JsonConvert.SerializeObject(fuelPolicy)}");
+                            }
+                        }
+                        //
+                        var rateRule = await GetRateRule(availRateRQ, veCore);
+                        if (rateRule != null)
+                        {
+                            //保险
+                            List<StdPricedCoverage> stdPricedCoverages = new List<StdPricedCoverage>();
+                            foreach (var pricedCoverage in rateRule.PricedCoverages.PricedCoverage)
+                            {
+                                StdPricedCoverage stdPriced = new StdPricedCoverage()
+                                {
+                                    CoverageType = BuildEnumCarCoverageType(pricedCoverage.Coverage.Code),
+                                    CoverageDescription = pricedCoverage.Coverage.CoverageDetails.Description,
+                                    Description = pricedCoverage.Coverage.CoverageDetails.Description,
+                                    CurrencyCode = pricedCoverage.CoverageCharge.CurrencyCode,
+                                    Amount = pricedCoverage.CoverageCharge.Amount,
+                                    TaxInclusive = pricedCoverage.CoverageCharge.TaxInclusive,
+                                    IncludedInRate = pricedCoverage.CoverageCharge.IncludedInRate,
+                                    //IncludedInEstTotalInd = false, //usertodo
+                                    Calculation = new StdCalculation
+                                    {
+                                        Quantity = pricedCoverage.CoverageCharge.Calculation.Quantity,
+                                        UnitName = pricedCoverage.CoverageCharge.Calculation.UnitName,
+                                        UnitCharge = pricedCoverage.CoverageCharge.Calculation.UnitCharge
+                                    },
+                                    MaxCharge = pricedCoverage.CoverageCharge.MinMax.MaxCharge,
+                                    MinCharge = pricedCoverage.CoverageCharge.MinMax.MinCharge,
+                                };
+                                stdPricedCoverages.Add(stdPriced);
+                            }
+                            std.PricedCoverages = stdPricedCoverages;
+                            List<StdVehicleCharge> vehCharges = new List<StdVehicleCharge>();
+                            var vehChargesList = rateRule.RentalRate.VehicleCharges.VehicleCharge;
+                            var FeesList = vehChargesList.Where(n => n.IncludedInRate).ToList();
+                            List<StdFee> stdfee = new List<StdFee>();
+                            foreach (var fe in FeesList)
+                            {
+                                var stdFee = _mapper.Map<VehicleCharge, StdFee>(fe);
+                                stdfee.Add(stdFee);
+                            }
+                            std.Fees = stdfee;
+                            //车辆收费
+                            var vehicleChargesList = vehChargesList.Where(n => !n.IncludedInRate).ToList();
+                            foreach (var item in vehicleChargesList)
+                            {
+                                Log.Information($"车辆收费信息{JsonConvert.SerializeObject(item)}");
+                                StdVehicleCharge newItem = new StdVehicleCharge
+                                {
+                                    Purpose = EnumCarCoverageType.OtherTaxesAndServiceCharges,
+                                    PurposeDescription = item.Description,
+                                    Description = item.Description,
+                                    CurrencyCode = item.CurrencyCode,
+                                    Amount = item.Amount,
+                                    TaxInclusive = item.TaxInclusive,
+                                };
+                                vehCharges.Add(newItem);
+                            }
+                            std.VehicleCharges = vehCharges;
+                        }
                     }
                 }
             }
             return null;
         }
 
+        public EnumCarCoverageType BuildEnumCarCoverageType(string code)
+        {
+            switch (code)
+            {
+                case "ALI":
+                    return EnumCarCoverageType.LiabilityInsuranceSupplement;
+
+                case "PEP":
+                    return EnumCarCoverageType.PersonalEffectsCoverage;
+
+                case "CDW":
+                    return EnumCarCoverageType.CollisionDamageWaiver;
+
+                case "PAI":
+                    return EnumCarCoverageType.PersonalAccidentInsurance;
+
+                default:
+                    Log.Error($"usertodo{code}");
+                    return EnumCarCoverageType.None;
+            }
+        }
+
+        /// <summary>
+        /// 获取费率规则
+        /// </summary>
+        /// <param name="availRateRQ"></param>
+        /// <param name="veCore"></param>
+        /// <returns></returns>
+        public async Task<OTA_VehRateRuleRS> GetRateRule(OTA_VehAvailRateRQ availRateRQ, VehAvailCore veCore)
+        {
+            var ruleRq = new OTA_VehRateRuleRQ
+            {
+                //返回请求数
+                Version = "1.0",
+                POS = new POS
+                {
+                    Source = new Source
+                    {
+                        RequestorID = new RequestorID { ID = _setting.UserID, Type = 1 }
+                    }
+                },
+                RentalInfo = new RentalInfo
+                {
+                    VehRentalCore = availRateRQ.VehAvailRQCore.VehRentalCore,
+                    //这个信息 必填 首选 Preferred
+                    VehicleInfo = new VehicleInfo
+                    {
+                        AirConditionPref = "Preferred", //指空调偏好 有空调信息返回 这里不知道要不要处理
+                        ClassPref = "Preferred",  //指车辆等级偏好
+                        TransmissionPref = "Preferred", //指变速箱偏好。
+                        TransmissionType = veCore.Vehicle.TransmissionType, //指变速箱类型。
+                        TypePref = "Preferred", //指车辆类型偏好
+                        VehType = new VehType { VehicleCategory = veCore.Vehicle?.VehType?.VehicleCategory },  //VehicleCategory 必须等于以下之一：1（轿车）、2（面包车）、3（SUV）、4（敞篷车）、8（旅行车）或 9（皮卡）。
+                        VehClass = new VehClass { Size = veCore.Vehicle?.VehClass?.Size == null ? 0 : veCore.Vehicle.VehClass.Size }, //当 VehicleCategory 为 “Car(1)” 时，DoorCount 必须是 “2” 或 “4”。 其他值可忽略
+                        VehGroup = new VehGroup { GroupType = "SIPP", GroupValue = veCore.Vehicle?.VehMakeModel?.Code }
+                    },
+                    RateQualifier = veCore.RentalRate.RateQualifier,
+                    CustomerID = new CustomerID { ID = availRateRQ.VehAvailRQInfo.Customer.Primary.CitizenCountryName.Code, Type = "1" }
+                },
+            };
+            var res = BuildEnvelope(new CommonRequest { OTA_VehRateRuleRQ = ruleRq, Type = 2 });
+            var model = ABGXmlHelper.GetResponse<OTA_VehRateRuleRS>(res);
+            return model;
+        }
+
+        public string BuildEnvelope(CommonRequest model)
+        {
+            ns_Request ns_Request = new ns_Request();
+            switch (model.Type)
+            {
+                case 1:
+                    ns_Request.OTA_VehAvailRateRQ = model.OTA_VehAvailRateRQ;
+                    break;
+
+                case 2:
+                    ns_Request.OTA_VehRateRuleRQ = model.OTA_VehRateRuleRQ;
+                    break;
+            }
+            var envelope = new Envelope
+            {
+                Header = new SOAP_ENV_Header
+                {
+                    Credentials = new Credentials
+                    {
+                        UserID = new EncodedString { Value = _setting.UserID, EncodingType = "xsd:string" },
+                        Password = new EncodedString { Value = _setting.Password, EncodingType = "xsd:string" }
+                    },
+                    WSBangRoadmap = new WSBang_Roadmap()
+                },
+                Body = new SOAP_ENV_Body
+                {
+                    Request = ns_Request
+                }
+            };
+            return ABGXmlHelper.PostRequest(_setting.Url, envelope);
+        }
+
+        /// <summary>
+        /// 构建车辆类型
+        /// </summary>
+        /// <param name="category"></param>
+        /// <returns></returns>
         public EnumCarVehicleCategory BuildCarType(string category)
         {
             switch (category)
@@ -277,4 +433,4 @@ namespace HeyTripCarWeb.Supplier.ABG
 public class Utf8StringWriter : StringWriter
 {
     public override Encoding Encoding => Encoding.UTF8;
-}
+}*/

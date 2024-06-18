@@ -1,21 +1,22 @@
-﻿using HeyTripCarWeb.Supplier.ABG.Config;
-using HeyTripCarWeb.Supplier.ABG.Models.RQs;
-using HeyTripCarWeb.Supplier.ABG.Models.RSs;
-using Serilog;
+﻿using Serilog;
 using System.Net;
-using System.Xml;
 using System.Xml.Serialization;
+using System.Xml;
+using HeyTripCarWeb.Supplier.ACE.Models.RQs;
+using System.Text;
+using System.Buffers;
+using System.Threading;
+using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using Twilio.TwiML;
-using static Dapper.SqlMapper;
 
-namespace HeyTripCarWeb.Supplier.ABG.Util
+namespace HeyTripCarWeb.Supplier.ACE.Util
 {
-    public class ABGXmlHelper
+    public class ACEXmlHelper
     {
-        public static string PostRequest(string url, Envelope envelope)
+        public static async Task<string> PostRequest(string url, ACEEnvelope envelope)
         {
             // Serialize the object to XML
-            XmlSerializer serializer = new XmlSerializer(typeof(Envelope));
+            XmlSerializer serializer = new XmlSerializer(typeof(ACEEnvelope));
             var requestXml = "";
             using (StringWriter writer = new Utf8StringWriter())
             {
@@ -30,51 +31,28 @@ namespace HeyTripCarWeb.Supplier.ABG.Util
                     // 添加命名空间声明
                     XmlSerializerNamespaces namespaces = new XmlSerializerNamespaces();
                     namespaces.Add("SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/");
-                    namespaces.Add("xsi", "http://www.w3.org/1999/XMLSchema-instance");
-                    namespaces.Add("xsd", "http://www.w3.org/1999/XMLSchema");
-                    namespaces.Add("ns", "http://wsg.avis.com/wsbang");
+                    namespaces.Add("xsi", "http://www.w3.org/2001/XMLSchema-instance");
+                    namespaces.Add("xsd", "http://www.w3.org/2001/XMLSchema");
 
                     // 序列化对象
                     serializer.Serialize(xmlWriter, envelope, namespaces);
                 }
                 requestXml = writer.ToString();
             }
-            string responseText = string.Empty;
-            HttpWebRequest request;
-            WebResponse response;
-            StreamReader reader;
-            try
+            // 发送 SOAP 请求
+            using (HttpContent postData = new StringContent(requestXml, Encoding.UTF8))
             {
-                request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = WebRequestMethods.Http.Post;
-                request.Headers.Add("ContentType:Text/Xml");
-                StreamWriter writer = new
-                StreamWriter(request.GetRequestStream());
-                writer.Write(requestXml);
-                writer.Close();
-                response = request.GetResponse();
-                reader = new
-                StreamReader(response.GetResponseStream());
-                responseText = reader.ReadToEnd();
-                response.Close();
-            }
-            catch (WebException wex)
-            {
-                response = wex.Response;
-                reader = new
-               StreamReader(response.GetResponseStream());
-                responseText = reader.ReadToEnd();
-                response.Close();
-            }
-            catch (System.Exception ex)
-            {
-                Log.Error($"请求接口异常{ex.Message}");
-            }
-            return responseText;
-        }
+                using (HttpClient httpClient = new HttpClient())
+                {
+                    httpClient.DefaultRequestHeaders.Add("SOAPAction", "\"http://ota.acerentacar.com/Sample/RateService/VehRetRes\"");
+                    var contentType = "text/xml";
+                    if (!string.IsNullOrEmpty(contentType))
+                        postData.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+                    HttpResponseMessage response = httpClient.PostAsync(url, postData).Result;
 
-        public static string BuildRequest<T>(T model, ABGAppSetting _setting)
-        {
+                    return response.Content.ReadAsStringAsync().Result;
+                }
+            }
             return "";
         }
 

@@ -138,12 +138,6 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
         public VehClass VehClass { get; set; }
     }
 
-    public class VehClass
-    {
-        [XmlAttribute]
-        public int Size { get; set; }
-    }
-
     public class DriverType
     {
         [XmlAttribute]

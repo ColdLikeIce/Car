@@ -3,6 +3,7 @@ using CommonCore.Dependency;
 using CommonCore.Enum;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Supplier.ABG.Config;
+using HeyTripCarWeb.Supplier.ACE.Config;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.OpenApi.Models;
@@ -38,6 +39,7 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml"));
 });
 builder.Services.Configure<ABGAppSetting>(builder.Configuration.GetSection("ABGAppSetting"));
+builder.Services.Configure<AceAppSetting>(builder.Configuration.GetSection("AceAppSetting"));
 // 添加数据库连接
 string connectionString = builder.Configuration.GetConnectionString("DbConnection");
 builder.Services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
