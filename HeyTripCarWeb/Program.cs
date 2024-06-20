@@ -1,6 +1,7 @@
 using CommonCore;
 using CommonCore.Dependency;
 using CommonCore.Enum;
+using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ACE.Config;
@@ -45,7 +46,7 @@ string connectionString = builder.Configuration.GetConnectionString("DbConnectio
 builder.Services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
 
 // 添加数据访问层
-//builder.Services.AddTransient(typeof(IRepository<>), typeof(DapperRepository<>));
+builder.Services.AddTransient(typeof(IRepository<>), typeof(DapperRepository<>));
 builder.Services.AddScopedDependencies(Assembly.GetExecutingAssembly()).AddMapper();
 
 var app = builder.Build();

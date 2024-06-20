@@ -22,22 +22,28 @@ namespace HeyTripCarWeb.Controllers
             return await _carSupplierApi.GetVehiclesAsync(dto);
         }
 
-        [HttpPost("CreateOrderAsync")]
+        [HttpPost("CreateOrder")]
         public async Task<StdCreateOrderRS> CreateOrderAsync([FromBody] StdCreateOrderRQ dto)
         {
             return await _carSupplierApi.CreateOrderAsync(dto);
         }
 
-        [HttpPost("CancelOrderAsync")]
+        [HttpPost("CancelOrder")]
         public async Task<StdCancelOrderRS> CancelOrderAsync([FromBody] StdCancelOrderRQ dto)
         {
             return await _carSupplierApi.CancelOrderAsync(dto);
         }
 
-        [HttpPost("QueryOrderAsync")]
+        [HttpPost("QueryOrder")]
         public async Task<StdQueryOrderRS> QueryOrderAsync([FromBody] StdQueryOrderRQ dto)
         {
             return await _carSupplierApi.QueryOrderAsync(dto);
+        }
+
+        [HttpGet("BuildLocation")]
+        public async Task BuildLocation()
+        {
+            await _carSupplierApi.BuildAllLocation();
         }
     }
 }

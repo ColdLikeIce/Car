@@ -68,5 +68,8 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RQs
     {
         [XmlAttribute("LocationCode")]
         public string LocationCode { get; set; }
+
+        [XmlAttribute("CodeContext")]
+        public string CodeContext { get; set; }
     }
 }

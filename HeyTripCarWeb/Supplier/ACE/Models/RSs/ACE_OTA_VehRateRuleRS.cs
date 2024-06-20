@@ -138,13 +138,35 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
         public string AssocAirportLocList { get; set; }
 
         [XmlElement(ElementName = "Address")]
-        public Address Address { get; set; }
+        public LocAddress Address { get; set; }
 
         [XmlElement(ElementName = "Telephone")]
-        public List<Telephone> Telephones { get; set; }
+        public LocTelephone[] Telephone { get; set; }
 
         [XmlElement(ElementName = "AdditionalInfo")]
         public AdditionalInfo AdditionalInfo { get; set; }
+    }
+
+    /// <summary>
+    /// 取车地址
+    /// </summary>
+    public class LocAddress
+    {
+        public string StreetNmbr { get; set; }
+        public string CityName { get; set; }
+        public string PostalCode { get; set; }
+        public StateProv StateProv { get; set; }
+        public CountryName CountryName { get; set; }
+    }
+
+    // StateProv element
+    public class StateProv
+    {
+        [XmlAttribute]
+        public string StateCode { get; set; }
+
+        [XmlText]
+        public string StateName { get; set; }
     }
 
     public class Address
@@ -174,7 +196,7 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
         public string Name { get; set; }
     }
 
-    public class Telephone
+    public class LocTelephone
     {
         [XmlAttribute(AttributeName = "PhoneTechType")]
         public int PhoneTechType { get; set; }
@@ -222,7 +244,7 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
     public class OperationSchedule
     {
         [XmlElement(ElementName = "OperationTimes")]
-        public List<OperationTime> OperationTimes { get; set; }
+        public OperationTimes OperationTimes { get; set; }
     }
 
     public class OperationTime

@@ -13,5 +13,7 @@ namespace HeyTripCarWeb.Supplier.ACE
         Task<StdCancelOrderRS> CancelOrderAsync(StdCancelOrderRQ cancelOrderRQ, int timeout = 15000);
 
         Task<StdQueryOrderRS> QueryOrderAsync(StdQueryOrderRQ queryOrderRQ, int timeout = 15000);
+
+        Task<bool> BuildAllLocation();
     }
 }

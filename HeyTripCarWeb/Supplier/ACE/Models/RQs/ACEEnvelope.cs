@@ -21,6 +21,15 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RQs
 
         [XmlElement("OTA_VehResRQ", Namespace = "http://www.opentravel.org/OTA/2003/05")]
         public ACE_OTA_VehResRQ ACE_OTA_VehResRQ { get; set; }
+
+        [XmlElement("OTA_VehRetResRQ", Namespace = "http://www.opentravel.org/OTA/2003/05")]
+        public ACE_OTA_VehRetResRQ ACE_OTA_VehRetResRQ { get; set; }
+
+        [XmlElement("OTAVehCancelRQ", Namespace = "http://www.opentravel.org/OTA/2003/05")]
+        public ACE_OTAVehCancelRQ ACE_OTAVehCancelRQ { get; set; }
+
+        [XmlElement("OTA_VehLocSearchRQ", Namespace = "http://www.opentravel.org/OTA/2003/05")]
+        public ACE_OTA_VehLocSearchRQ ACE_OTA_VehLocSearchRQ { get; set; }
     }
 
     public class CommonRequest
@@ -33,5 +42,8 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RQs
         public ACE_OTA_VehAvailRateRQ OTA_VehAvailRateRQ { get; set; }
         public ACE_OTA_VehRateRuleRQ ACE_OTA_VehRateRuleRQ { get; set; }
         public ACE_OTA_VehResRQ ACE_OTA_VehResRQ { get; set; }
+        public ACE_OTA_VehRetResRQ ACE_OTA_VehRetResRQ { get; set; }
+        public ACE_OTAVehCancelRQ ACE_OTAVehCancelRQ { get; set; }
+        public ACE_OTA_VehLocSearchRQ ACE_OTA_VehLocSearchRQ { get; set; }
     }
 }

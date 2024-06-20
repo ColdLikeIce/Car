@@ -73,8 +73,10 @@ namespace HeyTripCarWeb.Supplier.ACE.Util
             nsManager.AddNamespace("ota", "http://www.opentravel.org/OTA/2003/05");
             Type genericType = typeof(T);
             var nodeName = genericType.Name;
+            XmlRootAttribute xmlRootAttr = (XmlRootAttribute)genericType.GetCustomAttributes(typeof(XmlRootAttribute), false).FirstOrDefault();
+
             // 使用XPath查询OTA_VehAvailRateRS节点
-            XmlNode otaNode = xmlDoc.SelectSingleNode($"//ns:Response/ota:{nodeName}", nsManager);
+            XmlNode otaNode = xmlDoc.SelectSingleNode($"//ns:Response/ota:{xmlRootAttr.ElementName}", nsManager);
             if (otaNode == null)
             {
                 Log.Information($"找不到对应的节点{nodeName}");

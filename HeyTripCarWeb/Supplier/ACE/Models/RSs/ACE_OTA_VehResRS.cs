@@ -4,11 +4,11 @@ using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 
 namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
 {
-    // Define namespaces for XML serialization
+    // Root element OTA_VehResRS
     [XmlRoot(ElementName = "OTA_VehResRS", Namespace = "http://www.opentravel.org/OTA/2003/05")]
     public class ACE_OTA_VehResRS
     {
-        [XmlElement(ElementName = "Errors")]
+        [XmlElement("Errors")]
         public Errors Errors { get; set; }
 
         [XmlAttribute]
@@ -21,56 +21,65 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
         public string Version { get; set; }
 
         public Success Success { get; set; }
-
         public VehResRSCore VehResRSCore { get; set; }
     }
 
-    public class Errors
-    {
-        [XmlElement(ElementName = "Error")]
-        public List<Error> ErrorList { get; set; }
-    }
-
-    public class Error
-    {
-        [XmlAttribute(AttributeName = "Type")]
-        public string Type { get; set; }
-
-        [XmlText]
-        public string Message { get; set; }
-    }
-
+    // VehResRSCore element
     public class VehResRSCore
     {
         public VehReservation VehReservation { get; set; }
     }
 
+    // VehReservation element
     public class VehReservation
     {
         public Customer Customer { get; set; }
-
         public VehSegmentCore VehSegmentCore { get; set; }
-
         public VehSegmentInfo VehSegmentInfo { get; set; }
     }
 
+    public class Errors
+    {
+        public List<Error> ErrorList { get; set; }
+    }
+
+    public class Error
+    {
+        [XmlAttribute]
+        public string Version { get; set; }
+
+        public string Message { get; set; }
+    }
+
+    // Document element
+    public class Document
+    {
+        [XmlAttribute]
+        public string DocIssueLocation { get; set; }
+
+        [XmlAttribute]
+        public string DocID { get; set; }
+
+        [XmlAttribute]
+        public string DocType { get; set; }
+
+        [XmlAttribute]
+        public DateTime ExpireDate { get; set; }
+    }
+
+    // VehSegmentCore element
     public class VehSegmentCore
     {
         public ConfID ConfID { get; set; }
-
         public Vendor Vendor { get; set; }
-
         public VehRentalCore VehRentalCore { get; set; }
-
         public Vehicle Vehicle { get; set; }
-
         public RentalRate RentalRate { get; set; }
-
         public Fees Fees { get; set; }
-
         public TotalCharge TotalCharge { get; set; }
     }
 
+    // ConfID element
     public class ConfID
     {
         [XmlAttribute]
@@ -80,27 +89,15 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
         public string ID { get; set; }
     }
 
-    public class ReturnLocation
-    {
-        [XmlAttribute]
-        public string LocationCode { get; set; }
-
-        [XmlAttribute]
-        public string CodeContext { get; set; }
-    }
-
-    public class VehicleCharges
-    {
-        public List<VehicleCharge> VehicleCharge { get; set; }
-    }
-
+    // Fees element
     public class Fees
     {
-        public List<Fee> Fee { get; set; }
+        public Fee[] Fee { get; set; }
     }
 
+    // VehSegmentInfo element
     public class VehSegmentInfo
     {
-        public List<LocationDetails> LocationDetails { get; set; }
+        public LocationDetails LocationDetails { get; set; }
     }
 }
