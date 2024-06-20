@@ -1,9 +1,11 @@
-﻿/*using CommonCore.Mapper;
+﻿using CommonCore.Mapper;
+using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using HeyTripCarWeb.Supplier.ABG.Models.RSs;
 using HeyTripCarWeb.Supplier.ABG.Util;
+using HeyTripCarWeb.Supplier.ACE.Models.Dbs;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Serilog;
@@ -21,13 +23,15 @@ namespace HeyTripCarWeb.Supplier.ABG
 {
     public class ABGApi : ICarSupplierApi
     {
+        private readonly IRepository<AceLocation> _locRepository;
         private readonly ABGAppSetting _setting;
         private readonly IMapper _mapper;
 
-        public ABGApi(IOptions<ABGAppSetting> options, IMapper mapper)
+        public ABGApi(IOptions<ABGAppSetting> options, IMapper mapper, IRepository<AceLocation> locRepository)
         {
             _setting = options.Value;
             _mapper = mapper;
+            _locRepository = locRepository;
         }
 
         #region 原始接口
@@ -39,14 +43,14 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <param name="availRateRQ"></param>
         /// <param name="timeout"></param>
         /// <returns></returns>
-        public async Task<List<StdVehicle>> VehAvailRate(OTA_VehAvailRateRQ availRateRQ, int timeout = 45000)
+        public async Task<List<StdVehicle>> VehAvailRate(ABG_OTA_VehAvailRateRQ availRateRQ, int timeout = 45000)
         {
             var res = BuildEnvelope(new CommonRequest { OTA_VehAvailRateRQ = availRateRQ, Type = 1 });
-            var model = ABGXmlHelper.GetResponse<OTA_VehAvailRateRS>(res);
-            *//* if (!string.IsNullOrWhiteSpace(model.Errors?.Error?.ShortText))
-             {
-                 throw new Exception(model.Errors.Error.ShortText);
-             }*//*
+            var model = ABGXmlHelper.GetResponse<ABG_OTA_VehAvailRateRS>(res);
+            if (model.Errors != null && model.Errors?.ErrorList.Count > 0)
+            {
+                throw new Exception($"出现错误");
+            }
             if (model == null)
             {
             }
@@ -69,7 +73,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         std.DoorCount = (EnumCarDoorCount)veCore.Vehicle.VehType.DoorCount;
                         //VehicleCategory 必须等于以下之一：1（轿车）、2（面包车）、3（SUV）、4（敞篷车）、
                         //8（旅行车）或 9（皮卡）
-                        std.VehicleCategory = BuildCarType(veCore.Vehicle.VehType.VehicleCategory);
+                        std.VehicleCategory = BuildCarType(veCore.Vehicle.VehType.VehicleCategory.ToString());
                         // 尺寸必须等于以下产品之一：1（小型）、2（小型型）、3（经济型）、4（紧凑型）、
                         //  5（中型）、6（中级）、7（标准）、8（全尺寸）、9（豪华）、10（高级）或11（小型货车）。
                         std.VehicleClass = (EnumCarVehicleClass)veCore.Vehicle.VehClass.Size;
@@ -97,8 +101,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                         std.PictureURL = veCore.Vehicle.PictureURL;
                         std.TransmissionType = veCore.Vehicle.TransmissionType == "Manual" ? EnumCarTransmissionType.Manual : EnumCarTransmissionType.Automatic;
 
-                        *//*   std.MinDriverAge = 0; //userloss
-                           std.MaxDriverAge = 99; //userloss*//*
+                        std.MinDriverAge = 0; //userloss
+                        std.MaxDriverAge = 99; //userloss
                         var rentalRate = veCore.RentalRate;
                         var rateDistance = rentalRate.RateDistance;
                         //里程限制
@@ -149,26 +153,27 @@ namespace HeyTripCarWeb.Supplier.ABG
                         {
                             //保险
                             List<StdPricedCoverage> stdPricedCoverages = new List<StdPricedCoverage>();
-                            foreach (var pricedCoverage in rateRule.PricedCoverages.PricedCoverage)
+                            foreach (var pricedCoverage in rateRule.PricedCoverages)
                             {
+                                var charge = pricedCoverage.Charge;
                                 StdPricedCoverage stdPriced = new StdPricedCoverage()
                                 {
                                     CoverageType = BuildEnumCarCoverageType(pricedCoverage.Coverage.Code),
                                     CoverageDescription = pricedCoverage.Coverage.CoverageDetails.Description,
                                     Description = pricedCoverage.Coverage.CoverageDetails.Description,
-                                    CurrencyCode = pricedCoverage.CoverageCharge.CurrencyCode,
-                                    Amount = pricedCoverage.CoverageCharge.Amount,
-                                    TaxInclusive = pricedCoverage.CoverageCharge.TaxInclusive,
-                                    IncludedInRate = pricedCoverage.CoverageCharge.IncludedInRate,
+                                    CurrencyCode = charge.CurrencyCode,
+                                    Amount = charge.Amount,
+                                    TaxInclusive = charge.TaxInclusive,
+                                    IncludedInRate = charge.IncludedInRate,
                                     //IncludedInEstTotalInd = false, //usertodo
                                     Calculation = new StdCalculation
                                     {
-                                        Quantity = pricedCoverage.CoverageCharge.Calculation.Quantity,
-                                        UnitName = pricedCoverage.CoverageCharge.Calculation.UnitName,
-                                        UnitCharge = pricedCoverage.CoverageCharge.Calculation.UnitCharge
+                                        Quantity = charge.Calculation.Quantity,
+                                        UnitName = charge.Calculation.UnitName,
+                                        UnitCharge = charge.Calculation.UnitCharge
                                     },
-                                    MaxCharge = pricedCoverage.CoverageCharge.MinMax.MaxCharge,
-                                    MinCharge = pricedCoverage.CoverageCharge.MinMax.MinCharge,
+                                    MaxCharge = charge.MinMax.MaxCharge,
+                                    MinCharge = charge.MinMax.MinCharge,
                                 };
                                 stdPricedCoverages.Add(stdPriced);
                             }
@@ -235,7 +240,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <param name="availRateRQ"></param>
         /// <param name="veCore"></param>
         /// <returns></returns>
-        public async Task<OTA_VehRateRuleRS> GetRateRule(OTA_VehAvailRateRQ availRateRQ, VehAvailCore veCore)
+        public async Task<ABG_OTA_VehRateRuleRS> GetRateRule(ABG_OTA_VehAvailRateRQ availRateRQ, VehAvailCore veCore)
         {
             var ruleRq = new OTA_VehRateRuleRQ
             {
@@ -259,7 +264,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         TransmissionPref = "Preferred", //指变速箱偏好。
                         TransmissionType = veCore.Vehicle.TransmissionType, //指变速箱类型。
                         TypePref = "Preferred", //指车辆类型偏好
-                        VehType = new VehType { VehicleCategory = veCore.Vehicle?.VehType?.VehicleCategory },  //VehicleCategory 必须等于以下之一：1（轿车）、2（面包车）、3（SUV）、4（敞篷车）、8（旅行车）或 9（皮卡）。
+                        VehType = new Models.RQs.VehType { VehicleCategory = veCore.Vehicle.VehType.VehicleCategory },  //VehicleCategory 必须等于以下之一：1（轿车）、2（面包车）、3（SUV）、4（敞篷车）、8（旅行车）或 9（皮卡）。
                         VehClass = new VehClass { Size = veCore.Vehicle?.VehClass?.Size == null ? 0 : veCore.Vehicle.VehClass.Size }, //当 VehicleCategory 为 “Car(1)” 时，DoorCount 必须是 “2” 或 “4”。 其他值可忽略
                         VehGroup = new VehGroup { GroupType = "SIPP", GroupValue = veCore.Vehicle?.VehMakeModel?.Code }
                     },
@@ -268,7 +273,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                 },
             };
             var res = BuildEnvelope(new CommonRequest { OTA_VehRateRuleRQ = ruleRq, Type = 2 });
-            var model = ABGXmlHelper.GetResponse<OTA_VehRateRuleRS>(res);
+            var model = ABGXmlHelper.GetResponse<ABG_OTA_VehRateRuleRS>(res);
             return model;
         }
 
@@ -348,7 +353,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         public async Task<List<StdVehicle>> GetVehiclesAsync(StdGetVehiclesRQ vehicleRQ, int timeout = 45000)
         {
             //构建请求body 其他都一样
-            var availRateRQ = new OTA_VehAvailRateRQ
+            var availRateRQ = new ABG_OTA_VehAvailRateRQ
             {
                 //返回请求数
                 MaxResponses = 10000,
@@ -387,7 +392,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                             TransmissionPref = "Preferred", //指变速箱偏好。
                             TransmissionType = "Automatic", //指变速箱类型。
                             TypePref = "Preferred", //指车辆类型偏好
-                            VehType = new VehType { VehicleCategory = "1" },  //VehicleCategory 必须等于以下之一：1（轿车）、2（面包车）、3（SUV）、4（敞篷车）、8（旅行车）或 9（皮卡）。
+                            VehType = new VehType { VehicleCategory = 1 },  //VehicleCategory 必须等于以下之一：1（轿车）、2（面包车）、3（SUV）、4（敞篷车）、8（旅行车）或 9（皮卡）。
                             VehClass = new VehClass { Size = 4 } //当 VehicleCategory 为 “Car(1)” 时，DoorCount 必须是 “2” 或 “4”。 其他值可忽略
                         }
                     },
@@ -433,4 +438,4 @@ namespace HeyTripCarWeb.Supplier.ABG
 public class Utf8StringWriter : StringWriter
 {
     public override Encoding Encoding => Encoding.UTF8;
-}*/
+}

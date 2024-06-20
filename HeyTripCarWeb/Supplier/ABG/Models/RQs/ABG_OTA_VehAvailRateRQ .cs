@@ -3,7 +3,8 @@ using System.Xml.Serialization;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
 {
-    public class OTA_VehAvailRateRQ
+    [XmlRoot(ElementName = "OTA_VehAvailRateRQ")]
+    public class ABG_OTA_VehAvailRateRQ
     {
         [XmlElement(ElementName = "POS")]
         public POS POS { get; set; }
@@ -34,7 +35,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
     public class VehType
     {
         [XmlAttribute("VehicleCategory")]
-        public string VehicleCategory { get; set; }
+        public int VehicleCategory { get; set; }
 
         [XmlAttribute("DoorCount")]
         public int DoorCount { get; set; }

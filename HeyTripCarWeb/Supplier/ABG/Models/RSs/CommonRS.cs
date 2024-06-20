@@ -86,26 +86,29 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
 
     public class VehicleCharge
     {
-        [XmlAttribute(AttributeName = "TaxInclusive")]
+        [XmlAttribute]
         public bool TaxInclusive { get; set; }
 
-        [XmlAttribute(AttributeName = "Description")]
+        [XmlAttribute]
         public string Description { get; set; }
 
-        [XmlAttribute(AttributeName = "GuaranteedInd")]
+        [XmlAttribute]
         public bool GuaranteedInd { get; set; }
 
-        [XmlAttribute(AttributeName = "IncludedInRate")]
+        [XmlAttribute]
         public bool IncludedInRate { get; set; }
 
-        [XmlAttribute(AttributeName = "Amount")]
+        [XmlAttribute]
         public decimal Amount { get; set; }
 
-        [XmlAttribute(AttributeName = "CurrencyCode")]
+        [XmlAttribute]
         public string CurrencyCode { get; set; }
 
-        [XmlAttribute(AttributeName = "Purpose")]
+        [XmlAttribute]
         public string Purpose { get; set; }
+
+        public List<TaxAmount> TaxAmounts { get; set; }
+        public Calculation Calculation { get; set; }
     }
 
     public class TotalCharge

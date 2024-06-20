@@ -1,12 +1,15 @@
-﻿using HeyTripCarWeb.Supplier.ABG.Models.RQs;
+﻿using HeyTripCarWeb.Supplier.ACE.Models.RSs;
 using System.Xml.Serialization;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
 {
     [XmlRoot(ElementName = "OTA_VehAvailRateRS", Namespace = "http://www.opentravel.org/OTA/2003/05")]
-    public class OTA_VehAvailRateRS
+    public class ABG_OTA_VehAvailRateRS
     {
+        [XmlElement(ElementName = "Errors")]
+        public Errors Errors { get; set; }
+
         [XmlAttribute(AttributeName = "schemaLocation", Namespace = "http://www.w3.org/2001/XMLSchema-instance")]
         public string SchemaLocation { get; set; }
 
