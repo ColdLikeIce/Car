@@ -1,4 +1,5 @@
 ﻿using CommonCore.Mapper;
+using Dapper;
 using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Supplier.ACE.Config;
@@ -16,7 +17,6 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
-using Twilio.TwiML.Voice;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Stds;
@@ -24,6 +24,17 @@ using static Dapper.SqlMapper;
 
 namespace HeyTripCarWeb.Supplier.ACE
 {
+    /// <summary>
+    /// 结算价和计佣价和代收都是net rate。
+    /// 结算价包含：EstimatedTotalAmount。
+    /// 结算价字段：EstimatedTotalAmount。
+    /// 预付产品，底价模式。加15个点
+    /// 美元结算(月结)。
+    ///
+    ///
+    /// 支持机场三字码 六位位置码 连锁店代码
+    /// 设备即将被淘汰。请尽量避免让他们使用这一项功能，但在此期间，设备信息确实包含在车辆位置详情（VehLocDetails）中
+    /// </summary>
     public class ACEApi : IACEApi
     {
         private readonly IRepository<AceLocation> _locRepository;
@@ -169,7 +180,7 @@ Rent A Car</Vendor>
         </ns:Response>
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>";
-            //var res = await BuildEnvelope(new CommonRequest { ACE_OTA_VehLocSearchRQ = rq, Type = 5 });
+            res = await BuildEnvelope(new CommonRequest { ACE_OTA_VehLocSearchRQ = rq, Type = 5 });
             var model = ACEXmlHelper.GetResponse<ACE_OTA_VehLocSearchRS>(res);
             List<AceLocation> locList = new List<AceLocation>();
             foreach (var matchedLoc in model.VehMatchedLocs)
@@ -1296,8 +1307,8 @@ DefaultInd=""true"" />
                 DocInfo = JsonConvert.SerializeObject(customer.Primary.Document),
                 CreateTime = DateTime.Now,
                 OrderStatus = "Comfirmed", //usertodo
-                CancelTime = DateTime.Now,
-                ConfirmTime = DateTime.Now
+                /*    CancelTime = DateTime.Now,
+                    ConfirmTime = DateTime.Now*/
             };
             await _aceOrderRepository.InsertAsync(order);
             /* if (loc.Count > 1)

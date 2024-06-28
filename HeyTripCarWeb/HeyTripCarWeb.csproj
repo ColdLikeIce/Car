@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -46,6 +46,55 @@
     <Reference Include="XiWan.Car.BusinessShared">
       <HintPath>F:\GrabIntegration\project\Package\Car\XiWan.Car.BusinessShared.dll</HintPath>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Supplier\ABG\Doc\Avis\B_Locs.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Avis\B_Locs_holidayhours.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Avis\B_Locs_hrs.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Avis\CreditCard.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Avis\Locs.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Avis\Locs_holidayhours.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Avis\Locs_hrs.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Avis\Regions.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Budget\B_Fleet .dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Budget\B_Locs.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Budget\B_Locs_holidayhours.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Budget\B_Locs_hrs.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Budget\B_SpecialEquipmentWithCodes.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Supplier\ABG\Doc\Budget\B_YoungDriver.dat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Supplier\ABG\Sql\" />
   </ItemGroup>
 
 </Project>

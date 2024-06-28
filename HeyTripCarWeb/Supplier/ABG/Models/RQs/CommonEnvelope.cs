@@ -1,4 +1,5 @@
-﻿using System.Xml.Serialization;
+﻿using HeyTripCarWeb.Share.Dtos;
+using System.Xml.Serialization;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
 {
@@ -67,9 +68,22 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
     public class ns_Request
     {
         [XmlElement(ElementName = "OTA_VehAvailRateRQ", Namespace = "")]
-        public OTA_VehAvailRateRQ OTA_VehAvailRateRQ { get; set; }
+        public ABG_OTA_VehAvailRateRQ OTA_VehAvailRateRQ { get; set; }
+
         [XmlElement(ElementName = "OTA_VehRateRuleRQ", Namespace = "")]
-        public OTA_VehRateRuleRQ OTA_VehRateRuleRQ { get; set; }
+        public ABG_OTA_VehRateRuleRQ OTA_VehRateRuleRQ { get; set; }
+
+        [XmlElement(ElementName = "OTA_VehResRQ", Namespace = "")]
+        public ABG_OTA_VehResRQ ABG_OTA_VehResRQ { get; set; }
+
+        [XmlElement(ElementName = "OTA_VehCancelRQ", Namespace = "")]
+        public ABG_OTAVehCancelRQ ABG_OTAVehCancelRQ { get; set; }
+
+        [XmlElement(ElementName = "OTA_VehRetResRQ", Namespace = "")]
+        public ABG_OTA_VehRetResRQ ABG_OTA_VehRetResRQ { get; set; }
+
+        [XmlElement(ElementName = "OTA_VehLocSearchRQ", Namespace = "")]
+        public ABG_OTA_VehLocSearchRQ ABG_OTA_VehLocSearchRQ { get; set; }
     }
 
     #region 公用的节点
@@ -106,12 +120,37 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
     public class CommonRequest
     {
         /// <summary>
-        /// 1 可用性请求 2 速率请求 3 创建订单 4 取消订单
+        ///
         /// </summary>
-        public int? Type { get; set; }
+        public ApiEnum Type { get; set; }
 
-        public OTA_VehAvailRateRQ OTA_VehAvailRateRQ { get; set; }
-        public OTA_VehRateRuleRQ OTA_VehRateRuleRQ { get; set; }
+        /// <summary>
+        /// 搜价接口
+        /// </summary>
+
+        public ABG_OTA_VehAvailRateRQ OTA_VehAvailRateRQ { get; set; }
+
+        /// <summary>
+        /// 速率规则
+        /// </summary>
+        public ABG_OTA_VehRateRuleRQ OTA_VehRateRuleRQ { get; set; }
+
+        public ABG_OTA_VehResRQ ABG_OTA_VehResRQ { get; set; }
+
+        /// <summary>
+        /// 订单取消
+        /// </summary>
+        public ABG_OTAVehCancelRQ ABG_OTAVehCancelRQ { get; set; }
+
+        /// <summary>
+        /// 订单详情
+        /// </summary>
+        public ABG_OTA_VehRetResRQ ABG_OTA_VehRetResRQ { get; set; }
+
+        /// <summary>
+        /// 地址详情
+        /// </summary>
+        public ABG_OTA_VehLocSearchRQ ABG_OTA_VehLocSearchRQ { get; set; }
     }
 
     public class VehClass

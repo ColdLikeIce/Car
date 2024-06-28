@@ -44,9 +44,9 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.Dbs
         public string DocInfo { get; set; }
         public string VendorName { get; set; }
         public string VendorCode { get; set; }
-        public DateTime CreateTime { get; set; }
-        public DateTime ConfirmTime { get; set; }
-        public DateTime CancelTime { get; set; }
+        public DateTime? CreateTime { get; set; }
+        public DateTime? ConfirmTime { get; set; }
+        public DateTime? CancelTime { get; set; }
         public string OrderStatus { get; set; }
     }
 }

@@ -118,5 +118,8 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
 
         [XmlAttribute(AttributeName = "CurrencyCode")]
         public string CurrencyCode { get; set; }
+
+        [XmlAttribute(AttributeName = "EstimatedTotalAmount")]
+        public decimal EstimatedTotalAmount { get; set; }
     }
 }

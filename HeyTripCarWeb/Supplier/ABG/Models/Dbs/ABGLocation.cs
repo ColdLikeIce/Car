@@ -3,143 +3,47 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
 {
-    [Table("Abg_Location")]
+    [Table("Abg_Location_New")]
     public class ABGLocation
     {
-        [Key]
-        [Required]
-        [MaxLength(50)]
-        public string LocationCode { get; set; } // NOT NULL, primary key
+        // 必填字段
+        public string LocationCode { get; set; }  // 租车点代码
 
-        [Required]
-        [MaxLength(300)]
-        public string LocationName { get; set; } // NOT NULL
+        public string LocationName { get; set; }  // 租车点名称
+        public string RegionCode { get; set; }    // 地区代码
 
-        [MaxLength(300)]
-        public string StreetNmbr { get; set; }
+        // 可选字段
+        public string RegionName { get; set; }          // 地区名称
 
-        [MaxLength(300)]
-        public string AddressLine { get; set; }
-
-        [MaxLength(50)]
-        public string Latitude { get; set; }
-
-        [MaxLength(50)]
-        public string Longitude { get; set; }
-
-        [MaxLength(100)]
-        public string PhoneNumber { get; set; }
-
-        [MaxLength(10)]
-        public string AirportCode { get; set; }
-
-        [MaxLength(20)]
-        public string AirportCityDesignatorCodeType { get; set; }
-
-        [MaxLength(50)]
-        public string PostalCode { get; set; }
-
-        [MaxLength(3000)]
-        public string OperationTime { get; set; }
-
-        [Required]
-        [MaxLength(2)]
-        public string CountryCode { get; set; } // NOT NULL
-
-        [MaxLength(100)]
-        public string StateProv { get; set; }
-
-        [MaxLength(50)]
-        public string CityName { get; set; }
-
-        public int? AirportId { get; set; } // Nullable int
-
-        [MaxLength(10)]
-        public string VendorCode { get; set; }
-
-        [MaxLength(50)]
-        public string VendorId { get; set; }
-
-        [MaxLength(100)]
-        public string VendorName { get; set; }
-
-        [Required]
-        public DateTime CreateTime { get; set; } // NOT NULL
-
-        [Required]
-        public DateTime UpdateTime { get; set; } // NOT NULL
-
-        [MaxLength(5)]
-        public string LDBMnemonic { get; set; }
-
-        public int? LDBNumber { get; set; } // Nullable int
-
-        public int? FleetOwnerLDBNumber { get; set; } // Nullable int
-
-        [MaxLength(10)]
-        public string LocationType { get; set; }
-
-        [MaxLength(50)]
-        public string LicenseeType { get; set; }
-
-        [MaxLength(10)]
-        public string LocationStatusType { get; set; }
-
-        [MaxLength(10)]
-        public string DbrLocationCode { get; set; }
-
-        [MaxLength(5)]
-        public string TestLocationType { get; set; }
-
-        [MaxLength(10)]
-        public string PreferredServiceType { get; set; }
-
-        [MaxLength(5)]
-        public string InternationalDivisionCodeType { get; set; }
-
-        [MaxLength(10)]
-        public string RegionNo { get; set; }
-
-        [MaxLength(10)]
-        public string LatLongSourceType { get; set; }
-
-        [MaxLength(50)]
-        public string StationSiteCodeType { get; set; }
-
-        [MaxLength(20)]
-        public string ContactName { get; set; }
-
-        [MaxLength(10)]
-        public string WireLocationType { get; set; }
-
-        [MaxLength(10)]
-        public string AutonationIndType { get; set; }
-
-        [MaxLength(10)]
-        public string SelfServiceInd { get; set; }
-
-        [MaxLength(10)]
-        public string SecureLotInd { get; set; }
-
-        [MaxLength(10)]
-        public string TruckIndicator { get; set; }
-
-        [MaxLength(10)]
-        public string DotComLocationType { get; set; }
-
-        [MaxLength(10)]
-        public string DistanceFromMapOrigin { get; set; }
-
-        [MaxLength(500)]
-        public string ConsolidatedHours { get; set; }
-
-        [MaxLength(10)]
-        public string GDSLocationCode { get; set; }
-
-        [MaxLength(250)]
-        public string StateCode { get; set; }
-
-        [MaxLength(50)]
-        public string VendorLocId { get; set; }
+        public string RentalType { get; set; }          // 租赁类型
+        public string Latitude { get; set; }            // 纬度
+        public string Longitude { get; set; }           // 经度
+        public string PhoneNumber { get; set; }         // 电话号码
+        public string AlternativePhoneNumber { get; set; } // 备用电话号码
+        public string GeoIndicator { get; set; }        // 地理指示器
+        public string OutsideReturn { get; set; }       // 是否可以营业外还车
+        public string HasSkiRack { get; set; }          // 是否有滑雪架
+        public string HasSnowTyres { get; set; }        // 是否有雪地轮胎
+        public string HasSnowChains { get; set; }       // 是否有防滑链
+        public string HasChildSeat { get; set; }        // 是否有儿童座椅
+        public string HasRoofLuggage { get; set; }      // 是否有车顶行李架
+        public string HasHandControl { get; set; }      // 是否有手动控制装置
+        public string IsGPS { get; set; }               // 是否有 GPS
+        public string AvisPreferred { get; set; }       // 是否提供 Avis 优选服务
+        public string ShuttleServiceAvailable { get; set; } // 是否有穿梭巴士服务
+        public string RoadServiceAvailable { get; set; } // 是否提供道路服务
+        public string Email { get; set; }               // 电子邮件
+        public string Address { get; set; }             // 地址
+        public string City { get; set; }                // 城市
+        public string Postcode { get; set; }            // 邮政编码
+        public string APOCode { get; set; }             // APO 代码
+        public string CollectionAvailable { get; set; } // 是否提供取车服务
+        public string VendorCode { get; set; }          // 供应商代码
+        public string VendorId { get; set; }            // 供应商 ID
+        public string VendorName { get; set; }          // 供应商名称
+        public DateTime? CreateTime { get; set; }       // 创建时间
+        public DateTime? UpdateTime { get; set; }       // 更新时间
+        public int IsDeleted { get; set; }              // 是否已删除
+        public string OperationTimes { get; set; }
     }
 }

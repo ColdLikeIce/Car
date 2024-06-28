@@ -8,12 +8,15 @@ using System.Buffers;
 using System.Threading;
 using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using Twilio.TwiML;
+using HeyTripCarWeb.Share.Dtos;
+using HeyTripCarWeb.Share;
+using System;
 
 namespace HeyTripCarWeb.Supplier.ACE.Util
 {
     public class ACEXmlHelper
     {
-        public static async Task<string> PostRequest(string url, ACEEnvelope envelope)
+        public static async Task<string> PostRequest(string url, ACEEnvelope envelope, ApiEnum type = ApiEnum.Rule)
         {
             // Serialize the object to XML
             XmlSerializer serializer = new XmlSerializer(typeof(ACEEnvelope));
@@ -39,20 +42,79 @@ namespace HeyTripCarWeb.Supplier.ACE.Util
                 }
                 requestXml = writer.ToString();
             }
-            // 发送 SOAP 请求
-            using (HttpContent postData = new StringContent(requestXml, Encoding.UTF8))
+            var nowtime = DateTime.Now.ToString("hhMMss");
+            var theadId = Thread.CurrentThread.ManagedThreadId;
+            string responseText = string.Empty;
+            string level = "Info";
+            string exception = "";
+            HttpWebRequest request;
+            WebResponse response;
+            StreamReader reader;
+            Log.Information($"postApi_{nowtime}:请求参数【{requestXml}】");
+            try
             {
-                using (HttpClient httpClient = new HttpClient())
-                {
-                    httpClient.DefaultRequestHeaders.Add("SOAPAction", "\"http://ota.acerentacar.com/Sample/RateService/VehRetRes\"");
-                    var contentType = "text/xml";
-                    if (!string.IsNullOrEmpty(contentType))
-                        postData.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-                    HttpResponseMessage response = httpClient.PostAsync(url, postData).Result;
-
-                    return response.Content.ReadAsStringAsync().Result;
-                }
+                request = (HttpWebRequest)WebRequest.Create(url);
+                request.Method = WebRequestMethods.Http.Post;
+                request.Headers.Add("ContentType:Text/Xml");
+                request.Headers.Add("SOAPAction", "\"http://ota.acerentacar.com/Sample/RateService/VehRetRes\"");
+                StreamWriter writer = new
+                StreamWriter(request.GetRequestStream());
+                writer.Write(requestXml);
+                writer.Close();
+                response = request.GetResponse();
+                reader = new
+                StreamReader(response.GetResponseStream());
+                responseText = reader.ReadToEnd();
+                Log.Information($"postApi_{theadId}_{nowtime}:返回结果【{responseText}】");
+                response.Close();
             }
+            catch (WebException wex)
+            {
+                level = "Error";
+                exception = wex.Message;
+                Log.Error($"postApi_{theadId}_{nowtime}:返回异常{wex.Message}");
+                response = wex.Response;
+                reader = new
+               StreamReader(response.GetResponseStream());
+                responseText = reader.ReadToEnd();
+                response.Close();
+            }
+            catch (System.Exception ex)
+            {
+                level = "Error";
+                exception = ex.Message;
+                Log.Error($"postApi_{theadId}_{nowtime}:返回异常{ex.Message}");
+            }
+            finally
+            {
+                LogInfo loginfo = new LogInfo
+                {
+                    tableName = "Abg_SupplierRqLogInfo",
+                    logType = LogEnum.ABG,
+                    rqInfo = requestXml,
+                    rsInfo = responseText,
+                    Level = level,
+                    exception = exception,
+                    Date = DateTime.Now,
+                    ApiType = type,
+                    theadId = theadId
+                };
+                SupplierLogInstance.Instance.Enqueue(loginfo);
+            }
+            // 发送 SOAP 请求
+            /* using (HttpContent postData = new StringContent(requestXml, Encoding.UTF8))
+             {
+                 using (HttpClient httpClient = new HttpClient())
+                 {
+                     httpClient.DefaultRequestHeaders.Add("SOAPAction", "\"http://ota.acerentacar.com/Sample/RateService/VehRetRes\"");
+                     var contentType = "text/xml";
+                     if (!string.IsNullOrEmpty(contentType))
+                         postData.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+                     HttpResponseMessage response = httpClient.PostAsync(url, postData).Result;
+
+                     return response.Content.ReadAsStringAsync().Result;
+                 }
+             }*/
             return "";
         }
 

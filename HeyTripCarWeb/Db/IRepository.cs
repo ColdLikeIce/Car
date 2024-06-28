@@ -2,7 +2,7 @@
 {
     public interface IRepository<T> where T : class
     {
-        Task<IEnumerable<T>> GetAllAsync();
+        Task<List<T>> GetAllAsync();
 
         Task<T> GetByIdAsync(object id);
 
@@ -17,6 +17,8 @@
         Task<T> GetByIdAsync(string sql, object par);
 
         Task<int> UpdateBySqlAsync(string sql, object par);
+
+        Task<int> ExecuteSql(string sql, object par);
 
         #endregion sql封装
     }

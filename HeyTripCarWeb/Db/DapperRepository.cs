@@ -17,16 +17,17 @@ namespace HeyTripCarWeb.Db
             _dbConnection = dbConnection;
         }
 
-        public async Task<IEnumerable<T>> GetAllAsync()
+        public async Task<List<T>> GetAllAsync()
         {
-            var tableName = typeof(T).Name;
+            var tableName = await GetTableName<T>();
             var query = $"SELECT * FROM {tableName}";
-            return await _dbConnection.QueryAsync<T>(query);
+            var queryData = await _dbConnection.QueryAsync<T>(query);
+            return queryData.ToList();
         }
 
         public async Task<T> GetByIdAsync(object id)
         {
-            var tableName = typeof(T).Name;
+            var tableName = await GetTableName<T>();
             var query = $"SELECT * FROM {tableName} WHERE Id = @Id";
             return await _dbConnection.QueryFirstOrDefaultAsync<T>(query, new { Id = id });
         }
@@ -41,7 +42,12 @@ namespace HeyTripCarWeb.Db
             return await _dbConnection.ExecuteAsync(sql, par);
         }
 
-        public async Task<string> GetTableName(T entity)
+        public async Task<int> ExecuteSql(string sql, object par)
+        {
+            return await _dbConnection.ExecuteAsync(sql, par);
+        }
+
+        public async Task<string> GetTableName<T>()
         {
             var tableType = typeof(T);
             TableAttribute xmlRootAttr = (TableAttribute)tableType.GetCustomAttributes(typeof(TableAttribute), false).FirstOrDefault();
@@ -50,7 +56,7 @@ namespace HeyTripCarWeb.Db
 
         public async Task<int> InsertAsync(T entity)
         {
-            var tableName = await GetTableName(entity);
+            var tableName = await GetTableName<T>();
             var query = GenerateInsertQuery(tableName, entity);
             return await _dbConnection.ExecuteAsync(query, entity);
         }
@@ -71,10 +77,22 @@ namespace HeyTripCarWeb.Db
 
         private string GenerateInsertQuery(string tableName, T entity)
         {
-            var properties = typeof(T).GetProperties();
+            var properties = typeof(T).GetProperties().Where(p => !IsIdentityProperty(p)) // 排除自增属性
+                                   .ToArray();
             var columns = string.Join(", ", properties.Select(p => p.Name));
             var values = string.Join(", ", properties.Select(p => "@" + p.Name));
             return $"INSERT INTO {tableName} ({columns}) VALUES ({values})";
+        }
+
+        /// <summary>
+        /// 排除自增属性
+        /// </summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
+        private bool IsIdentityProperty(PropertyInfo property)
+        {
+            var identityAttribute = property.GetCustomAttribute<System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute>();
+            return identityAttribute != null && identityAttribute.DatabaseGeneratedOption == System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity;
         }
 
         private string GenerateUpdateQuery(string tableName, T entity)

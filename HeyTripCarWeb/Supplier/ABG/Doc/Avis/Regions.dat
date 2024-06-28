@@ -1,0 +1,284 @@
+0	Regions	07June2024				
+1	AB0       	Aruba	CRB     	CARIBBEAN	AW	Aruba
+1	AD0       	Andorra	EUR     	EUROPE	AD	Andorra
+1	AG0       	Antigua	CRB     	CARIBBEAN	AG	Antigua And Barbuda
+1	AI0       	Anguilla	CRB     	CARIBBEAN	AI	Anguilla
+1	AL0       	Albania	EUR     	EUROPE	AL	Albania
+1	AM0       	Armenia	ASIA    	ASIA	AM	Armenia
+1	AN0       	Curacao	CRB     	CARIBBEAN	CW	Curacao
+1	AO0       	Angola	AFR     	AFRICA	AO	Angola
+1	AR0       	Argentina	LAC     	LATIN AMERICA	AR	Argentina
+1	AS0       	Samoa, American	PAC     	PACIFIC	WS	Samoa
+1	AT0       	Austria	EUR     	EUROPE	AT	Austria
+1	AU0       	Australia	PAC     	PACIFIC	AU	Australia
+1	AZ0       	Azerbaijan	EUR     	EUROPE	AZ	Azerbaijan
+1	BA0       	Belarus	EUR     	EUROPE	BY	Belarus
+1	BB0       	Barbados	LAC     	LATIN AMERICA	BB	Barbados
+1	BE0       	Belgium	EUR     	EUROPE	BE	Belgium
+1	BG0       	Bulgaria	EUR     	EUROPE	BG	Bulgaria
+1	BH0       	Bahrain	MEST    	MIDDLE EAST	BH	Bahrain
+1	BN0       	Brunei	ASIA    	ASIA	BN	Brunei Darussalam
+1	BO0       	Bolivia	LAC     	LATIN AMERICA	BO	Bolivia
+1	BP0       	Benin	AFR     	AFRICA	BJ	Benin
+1	BR0       	Brazil	LAC     	LATIN AMERICA	BR	Brazil
+1	BS0       	Bahamas	CRB     	CARIBBEAN	BS	Bahamas
+1	BU0       	Myanmar	ASIA    	ASIA	MM	Myanmar
+1	BW0       	Botswana	AFR     	AFRICA	BW	Botswana
+1	BY0       	St. Barthelemy	CRB     	CARIBBEAN	BL	St Barthelemy
+1	BZ0       	Belize	LAC     	LATIN AMERICA	BZ	Belize
+1	CA0       	Canada	CA      	CANADA	CA	Canada
+1	CAAB      	Alberta	CA      	CANADA	CA	Canada
+1	CABC      	British Columbia	CA      	CANADA	CA	Canada
+1	CALB      	Labrador	CA      	CANADA	CA	Canada
+1	CAMB      	Manitoba	CA      	CANADA	CA	Canada
+1	CANB      	New Brunswick	CA      	CANADA	CA	Canada
+1	CANF      	Newfoundland	CA      	CANADA	CA	Canada
+1	CANS      	Nova Scotia	CA      	CANADA	CA	Canada
+1	CANT      	Northwest Territories	CA      	CANADA	CA	Canada
+1	CAON      	Ontario	CA      	CANADA	CA	Canada
+1	CAPE      	Prince Edward Island	CA      	CANADA	CA	Canada
+1	CAPQ      	Quebec	CA      	CANADA	CA	Canada
+1	CASK      	Saskatchewan	CA      	CANADA	CA	Canada
+1	CAYT      	Yukon Territory	CA      	CANADA	CA	Canada
+1	CB0       	Cape Verdi	EUR     	EUROPE	CV	Cape Verde
+1	CC0       	Cayman Brac	CRB     	CARIBBEAN	KY	Cayman Islands
+1	CD0       	Chad	AFR     	AFRICA	TD	Chad
+1	CF0       	Central African Republic	AFR     	AFRICA	CF	Central African Republic
+1	CG0       	Congo	AFR     	AFRICA	CG	Congo
+1	CH0       	Switzerland	EUR     	EUROPE	CH	Switzerland
+1	CI0       	Ivory Coast	AFR     	AFRICA	CI	Ivory Coast
+1	CJ0       	Comores	AFR     	AFRICA	KM	Comoros
+1	CK0       	Cook Islands (Raratonga)	PAC     	PACIFIC	CK	Cook Islands
+1	CL0       	Chile	LAC     	LATIN AMERICA	CL	Chile
+1	CM0       	Cameroon	AFR     	AFRICA	CM	Cameroon
+1	CN0       	China	ASIA    	ASIA	CN	China
+1	CO0       	Colombia	LAC     	LATIN AMERICA	CO	Colombia
+1	CR0       	Costa Rica	LAC     	LATIN AMERICA	CR	Costa Rica
+1	CS0       	Czech Republic	EUR     	EUROPE	CZ	Czech Republic
+1	CT0       	Grand Cayman	CRB     	CARIBBEAN	KY	Grand Cayman
+1	CV0       	St Thomas	LAC     	LATIN AMERICA	VI	St Thomas, Virgin Islands
+1	CX0       	St Croix	LAC     	LATIN AMERICA	VI	St Croix, Virgin Islands, U.S.
+1	CY0       	Cyprus	EUR     	EUROPE	CY	Cyprus
+1	DE0       	Germany	EUR     	EUROPE	DE	Germany
+1	DK0       	Denmark	EUR     	EUROPE	DK	Denmark
+1	DM0       	Dominica	CRB     	CARIBBEAN	DM	Dominica
+1	DO0       	Dominican Republic	CRB     	CARIBBEAN	DO	Dominican Republic
+1	EC0       	Ecuador	LAC     	LATIN AMERICA	EC	Ecuador
+1	EE0       	Estonia	EUR     	EUROPE	EE	Estonia
+1	EG0       	Egypt	MEST    	MIDDLE EAST	EG	Egypt
+1	EL0       	El Salvador	LAC     	LATIN AMERICA	SV	El Salvador
+1	EQ0       	Equatorial Guinea	AFR     	AFRICA	GQ	Equatorial Guinea
+1	ES0       	Spain: Spain Mainland	EUR     	EUROPE	ES	Spain
+1	ES1       	Spain: Balearic Islands	EUR     	EUROPE	ES	Spain
+1	ES2       	Spain: Canary Islands	EUR     	EUROPE	ES	Spain
+1	ET0       	Ethiopia	AFR     	AFRICA	ET	Ethiopia
+1	EU0       	St. Eustatius	CRB     	CARIBBEAN	BQ	St Eustatius
+1	FG0       	French Guiana	LAC     	LATIN AMERICA	GF	French Guiana
+1	FI0       	Finland	EUR     	EUROPE	FI	Finland
+1	FJ0       	Fiji Islands	PAC     	PACIFIC	FJ	Fiji
+1	FO0       	Faroe Isles	EUR     	EUROPE	FO	Faroe Islands
+1	FR0       	France: France Mainland	EUR     	EUROPE	FR	France
+1	FR1       	France: Corsica	EUR     	EUROPE	FR	France
+1	GA0       	Gabon	AFR     	AFRICA	GA	Gabon
+1	GB0       	United Kingdom: Uk Mainland	EUR     	EUROPE	GB	United Kingdom
+1	GB1       	United Kingdom: Jersey	EUR     	EUROPE	GB	United Kingdom
+1	GB2       	United Kingdom: Guernsey	EUR     	EUROPE	GB	United Kingdom
+1	GB3       	United Kingdom: Northern Irela	EUR     	EUROPE	GB	United Kingdom
+1	GB4       	United Kingdom: Isle Of Man	EUR     	EUROPE	GB	United Kingdom
+1	GB5       	United Kingdom: Orkney Isles	EUR     	EUROPE	GB	United Kingdom
+1	GB6       	United Kingdom: Shetland Isles	EUR     	EUROPE	GB	United Kingdom
+1	GD0       	Grenada	CRB     	CARIBBEAN	GD	Grenada
+1	GE0       	Georgia	EUR     	EUROPE	GE	Georgia
+1	GH0       	Ghana	AFR     	AFRICA	GH	Ghana
+1	GI0       	Gibraltar	EUR     	EUROPE	GI	Gibraltar
+1	GM0       	Gambia	AFR     	AFRICA	GM	Gambia
+1	GN0       	Guinea	AFR     	AFRICA	GN	Guinea
+1	GP0       	Guadeloupe	CRB     	CARIBBEAN	GP	Guadeloupe
+1	GR0       	Greece	EUR     	EUROPE	GR	Greece
+1	GR1       	Greece: Corfu	EUR     	EUROPE	GR	Greece
+1	GR2       	Greece: Crete	EUR     	EUROPE	GR	Greece
+1	GR3       	Greece: Aegean Islands	EUR     	EUROPE	GR	Greece
+1	GR4       	Greece: Ionian Islands	EUR     	EUROPE	GR	Greece
+1	GR6       	Greece: Rhodes	EUR     	EUROPE	GR	Greece
+1	GT0       	Guatemala	LAC     	LATIN AMERICA	GT	Guatemala
+1	GU0       	Guam	ASIA    	ASIA	GU	Guam
+1	HD0       	Honduras	LAC     	LATIN AMERICA	HN	Honduras
+1	HK0       	Hong Kong	ASIA    	ASIA	HK	Hong kong
+1	HR0       	Croatia	EUR     	EUROPE	HR	Croatia
+1	HT0       	Haiti	CRB     	CARIBBEAN	HT	Haiti
+1	HU0       	Hungary	EUR     	EUROPE	HU	Hungary
+1	ID0       	Indonesia	ASIA    	ASIA	ID	Indonesia
+1	IE0       	Ireland Republic Of	EUR     	EUROPE	IE	Ireland
+1	IL0       	Israel	MEST    	MIDDLE EAST	IL	Israel
+1	IN0       	India	ASIA    	ASIA	IN	India
+1	IQ0       	Iraq	ASIA    	ASIA	IQ	Iraq
+1	IS0       	Iceland	EUR     	EUROPE	IS	Iceland
+1	IT0       	Italy: Italy Mainland	EUR     	EUROPE	IT	Italy
+1	IT1       	Italy: Sicily	EUR     	EUROPE	IT	Italy
+1	IT2       	Italy: Sardinia	EUR     	EUROPE	IT	Italy
+1	JM0       	Jamaica	CRB     	CARIBBEAN	JM	Jamaica
+1	JN0       	St John	LAC     	LATIN AMERICA	VI	St John, Virgin Islands, U.S.
+1	JO0       	Jordan	MEST    	MIDDLE EAST	JO	Jordan
+1	JP0       	Japan	ASIA    	ASIA	JP	Japan (GSA)
+1	KE0       	Kenya	AFR     	AFRICA	KE	Kenya
+1	KF0       	Zimbabwe	AFR     	AFRICA	ZW	Zimbabwe
+1	KH0       	Cambodia	ASIA    	ASIA	KH	Cambodia
+1	KP0       	Korea	ASIA    	ASIA	KR	Korea, Republic Of
+1	KS0       	Kosovo	EUR     	Europe	XK	Kosovo
+1	KW0       	Kuwait	MEST    	MIDDLE EAST	KW	Kuwait
+1	KZ0       	Kazakstan	EUR     	EUROPE	KZ	Kazakhstan
+1	LA0       	Lao People's Democratic Republic	ASIA    	ASIA	LA	Lao People'S Democratic Republic
+1	LB0       	Lebanon	MEST    	MIDDLE EAST	LB	Lebanon
+1	LC0       	St. Lucia	CRB     	CARIBBEAN	LC	St. Lucia
+1	LK0       	Sri Lanka	ASIA    	ASIA	LK	Sri Lanka
+1	LR0       	Liberia	AFR     	AFRICA	LR	Liberia
+1	LS0       	Lesotho	AFR     	AFRICA	LS	Lesotho
+1	LT0       	Lithuania	EUR     	EUROPE	LT	Lithuania
+1	LU0       	Luxembourg	EUR     	EUROPE	LU	Luxembourg
+1	LV0       	Latvia	EUR     	EUROPE	LV	Latvia
+1	LY0       	Libyan Arab Jamahiriya	AFR     	AFRICA	LY	Libyan Arab Jamahiriya
+1	MA0       	Morocco	AFR     	AFRICA	MA	Morocco
+1	MD0       	Moldova	EUR     	EUROPE	MD	Moldova
+1	ME0       	Montenegro	EUR     	EUROPE	ME	Republic of Montenegro
+1	MG0       	Madagascar	AFR     	AFRICA	MG	Madagascar
+1	MK0       	Macau	ASIA    	ASIA	MO	Macau
+1	ML0       	Mali	AFR     	AFRICA	ML	Mali
+1	MO0       	Mongolia	ASIA    	ASIA	MN	Mongolia
+1	MQ0       	Martinique	CRB     	CARIBBEAN	MQ	Martinique
+1	MT0       	Malta	EUR     	EUROPE	MT	Malta
+1	MU0       	Mauritius	AFR     	AFRICA	MU	Mauritius
+1	MW0       	Malawi	AFR     	AFRICA	MW	Malawi
+1	MX0       	Mexico	LAC     	LATIN AMERICA	MX	Mexico
+1	MY0       	Malaysia: Malaysia (All)	ASIA    	ASIA	MY	Malaysia
+1	MZ0       	Mozambique	AFR     	AFRICA	MZ	Mozambique
+1	NC0       	New Caledonia	PAC     	PACIFIC	NC	New Caledonia
+1	NG0       	Nigeria	AFR     	AFRICA	NG	Nigeria
+1	NH0       	Vanuatu	PAC     	PACIFIC	VU	Vanuatu
+1	NI0       	Nicaragua	LAC     	LATIN AMERICA	NI	Nicaragua
+1	NL0       	Netherlands	EUR     	EUROPE	NL	Netherlands
+1	NO0       	Norway	EUR     	EUROPE	NO	Norway
+1	NR0       	Niger	AFR     	AFRICA	NE	Niger
+1	NU0       	Papua New Guinea	PAC     	PACIFIC	PG	Papua New Guinea
+1	NZ0       	New Zealand	PAC     	PACIFIC	NZ	New Zealand
+1	OM0       	Oman	MEST    	MIDDLE EAST	OM	Oman
+1	PA0       	Panama	LAC     	LATIN AMERICA	PA	Panama
+1	PE0       	Peru	LAC     	LATIN AMERICA	PE	Peru
+1	PH0       	Philippines	ASIA    	ASIA	PH	Philippines
+1	PK0       	Pakistan	ASIA    	ASIA	PK	Pakistan
+1	PL0       	Poland	EUR     	EUROPE	PL	Poland
+1	PR0       	Puerto Rico	CRB     	CARIBBEAN	PR	Puerto Rico
+1	PT0       	Portugal: Portugal Mainland	EUR     	EUROPE	PT	Portugal
+1	PT1       	Portugal: Madeira	EUR     	EUROPE	PT	Portugal
+1	PT2       	Portugal: Azores	EUR     	EUROPE	PT	Portugal
+1	PY0       	Paraguay	LAC     	LATIN AMERICA	PY	Paraguay
+1	QA0       	Qatar	MEST    	MIDDLE EAST	QA	Qatar
+1	QB0       	Bosnia	EUR     	EUROPE	BA	Bosnia And Herzegovina
+1	QC0       	St Petersburg	EUR     	EUROPE	RU	Russia
+1	QJ0       	Japan	Asia    	Asia	JP	Japan
+1	QM0       	Macedonia	EUR     	EUROPE	MK	Macedonia
+1	QS0       	Slovenia	EUR     	EUROPE	SI	Slovenia
+1	QV0       	Slovak Republic	EUR     	EUROPE	SK	Slovakia
+1	RI0       	Reunion Island	AFR     	AFRICA	RE	Reunion Island
+1	RO0       	Romania	EUR     	EUROPE	RO	Romania
+1	RS0       	Serbia	EUR     	EUROPE	RS	Republic of Serbia
+1	RU0       	Russia	EUR     	EUROPE	RU	Russia
+1	SA0       	Saudi Arabia	MEST    	MIDDLE EAST	SA	Saudi Arabia
+1	SC0       	Seychelles	AFR     	AFRICA	SC	Seychelles
+1	SE0       	Sweden	EUR     	EUROPE	SE	Sweden
+1	SG0       	Singapore	ASIA    	ASIA	SG	Singapore
+1	SG1       	Singapore Prestige	ASIA    	ASIA	SG	Singapore
+1	SI0       	Solomon Islands	PAC     	PACIFIC	SB	Solomon Islands
+1	SK0       	St Kitts	CRB     	CARIBBEAN	KN	Saint Kitts And Nevis
+1	SN0       	Senegal	AFR     	AFRICA	SN	Senegal
+1	SR0       	Suriname	LAC     	LATIN AMERICA	SR	Suriname
+1	ST0       	Sao Tome And Principe	AFR     	AFRICA	ST	Sao Tome And Principe
+1	SW0       	Namibia	AFR     	AFRICA	NA	Namibia
+1	SY0       	Syria	MEST    	MIDDLE EAST	SY	Syrian
+1	SZ0       	Swaziland	AFR     	AFRICA	SZ	Swaziland
+1	TA0       	French Polynesia (Tahiti)	PAC     	PACIFIC	PF	French Polynesia (Tahiti)
+1	TB0       	Republic Of China (Taiwan)	ASIA    	ASIA	TW	Taiwan
+1	TC0       	Turks & Caicos Islands	CRB     	CARIBBEAN	TC	Turks And Caicos Islands
+1	TG0       	Togo	AFR     	AFRICA	TG	Togo
+1	TH0       	Thailand	ASIA    	ASIA	TH	Thailand
+1	TL0       	Tortola	CRB     	CARIBBEAN	VG	Tortola
+1	TN0       	Tunisia	AFR     	AFRICA	TN	Tunisia
+1	TO0       	Tonga	PAC     	PACIFIC	TO	Tonga
+1	TR0       	Turkey	EUR     	EUROPE	TR	Turkey
+1	TT0       	Trinidad & Tobago	CRB     	CARIBBEAN	TT	Trinidad And Tobago
+1	TZ0       	Tanzania	AFR     	AFRICA	TZ	Tanzania
+1	UA0       	Ukraine	EUR     	EUROPE	UA	Ukraine
+1	UE0       	United Arab Emirates	MEST    	MIDDLE EAST	AE	United Arab Emirates
+1	UG0       	Uganda	AFR     	AFRICA	UG	Uganda
+1	US0       	United States	US      	UNITED STATES	US	United States
+1	USAK      	Alaska	US      	UNITED STATES	US	United States
+1	USAL      	Alabama	US      	UNITED STATES	US	United States
+1	USAR      	Arkansas	US      	UNITED STATES	US	United States
+1	USAZ      	Arizona	US      	UNITED STATES	US	United States
+1	USCA      	California	US      	UNITED STATES	US	United States
+1	USCO      	Colorado	US      	UNITED STATES	US	United States
+1	USCT      	Connecticut	US      	UNITED STATES	US	United States
+1	USDC      	District Of Columbia	US      	UNITED STATES	US	United States
+1	USDE      	Delaware	US      	UNITED STATES	US	United States
+1	USFL      	Florida	US      	UNITED STATES	US	United States
+1	USGA      	Georgia	US      	UNITED STATES	US	United States
+1	USHI      	Hawaii	US      	UNITED STATES	US	United States
+1	USIA      	Iowa	US      	UNITED STATES	US	United States
+1	USID      	Idaho	US      	UNITED STATES	US	United States
+1	USIL      	Illinois	US      	UNITED STATES	US	United States
+1	USIN      	Indiana	US      	UNITED STATES	US	United States
+1	USKS      	Kansas	US      	UNITED STATES	US	United States
+1	USKY      	Kentucky	US      	UNITED STATES	US	United States
+1	USLA      	Louisiana	US      	UNITED STATES	US	United States
+1	USMA      	Massachusetts	US      	UNITED STATES	US	United States
+1	USMD      	Maryland	US      	UNITED STATES	US	United States
+1	USME      	Maine	US      	UNITED STATES	US	United States
+1	USMI      	Michigan	US      	UNITED STATES	US	United States
+1	USMN      	Minnesota	US      	UNITED STATES	US	United States
+1	USMO      	Missouri	US      	UNITED STATES	US	United States
+1	USMS      	Mississippi	US      	UNITED STATES	US	United States
+1	USMT      	Montana	US      	UNITED STATES	US	United States
+1	USNC      	North Carolina	US      	UNITED STATES	US	United States
+1	USND      	North Dakota	US      	UNITED STATES	US	United States
+1	USNE      	Nebraska	US      	UNITED STATES	US	United States
+1	USNH      	New Hampshire	US      	UNITED STATES	US	United States
+1	USNJ      	New Jersey	US      	UNITED STATES	US	United States
+1	USNM      	New Mexico	US      	UNITED STATES	US	United States
+1	USNV      	Nevada	US      	UNITED STATES	US	United States
+1	USNY      	New York	US      	UNITED STATES	US	United States
+1	USOH      	Ohio	US      	UNITED STATES	US	United States
+1	USOK      	Oklahoma	US      	UNITED STATES	US	United States
+1	USOR      	Oregon	US      	UNITED STATES	US	United States
+1	USPA      	Pennsylvania	US      	UNITED STATES	US	United States
+1	USRI      	Rhode Island	US      	UNITED STATES	US	United States
+1	USSC      	South Carolina	US      	UNITED STATES	US	United States
+1	USSD      	South Dakota	US      	UNITED STATES	US	United States
+1	USTN      	Tennnessee	US      	UNITED STATES	US	United States
+1	USTX      	Texas	US      	UNITED STATES	US	United States
+1	USUT      	Utah	US      	UNITED STATES	US	United States
+1	USVA      	Virgina	US      	UNITED STATES	US	United States
+1	USVT      	Vermont	US      	UNITED STATES	US	United States
+1	USWA      	Washington	US      	UNITED STATES	US	United States
+1	USWI      	Wisconsin	US      	UNITED STATES	US	United States
+1	USWV      	West Virginia	US      	UNITED STATES	US	United States
+1	USWY      	Wyoming	US      	UNITED STATES	US	United States
+1	UV0       	Burkina Faso	AFR     	AFRICA	BF	Burkina Faso
+1	UY0       	Uruguay	LAC     	LATIN AMERICA	UY	Uruguay
+1	VC0       	St. Vincent	CRB     	CARIBBEAN	VC	St Vincent And The Grenadines
+1	VE0       	Venezuela	LAC     	LATIN AMERICA	VE	Venezuela
+1	VN0       	Vietnam	ASIA    	ASIA	VN	Viet Nam
+1	WS0       	Samoa, Western	PAC     	PACIFIC	WS	Western Samoa
+1	YD0       	Yemen	MEST    	MIDDLE EAST	YE	Yemen
+1	YE0       	Bonaire	CRB     	CARIBBEAN	BQ	Bonaire
+1	YT0       	Mayotte	AFR     	AFRICA	YT	Mayotte
+1	YU        	Andorra	EUR     	EUROPE	AD	Andorra
+1	YU0       	Serbia & Montenegro	EUR     	EUROPE	CS	Serbia And Montenegro
+1	ZA0       	South Africa: South Africa (Al	AFR     	AFRICA	ZA	South Africa
+1	ZA1       	South Africa: Luxury Cars	AFR     	AFRICA	ZA	South Africa
+1	ZA2       	South Africa: Vans 4X4	AFR     	AFRICA	ZA	South Africa
+1	ZA3       	South Africa: Chauffeur Drive	AFR     	AFRICA	ZA	South Africa
+1	ZA4       	South Africa: Trailers	AFR     	AFRICA	ZA	South Africa
+1	ZB0       	Zambia	AFR     	AFRICA	ZM	Zambia
+1	ZF0       	St. Martin/St. Maarten	CRB     	CARIBBEAN	MF	St Martin, France
+1	ZM0       	Congo D.R.	AFR     	AFRICA	CD	Congo D.R.
+1	ZY0       	St. Maarten/St. Martin	CRB     	CARIBBEAN	SX	St Martin, Netherlands
+9	Regions	07June2024	282			 

@@ -40,14 +40,19 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
 
     public class Errors
     {
+        [XmlElement(ElementName = "Error")]
         public List<Error> ErrorList { get; set; }
     }
 
     public class Error
     {
-        [XmlAttribute]
-        public string Version { get; set; }
+        [XmlAttribute(AttributeName = "Type")]
+        public string Type { get; set; }
 
+        [XmlAttribute(AttributeName = "ShortText")]
+        public string ShortText { get; set; }
+
+        [XmlText]
         public string Message { get; set; }
     }
 

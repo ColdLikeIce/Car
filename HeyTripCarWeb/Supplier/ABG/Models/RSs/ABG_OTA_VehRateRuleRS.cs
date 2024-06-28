@@ -1,4 +1,5 @@
-﻿using HeyTripCarWeb.Supplier.ACE.Models.RSs;
+﻿using HeyTripCarWeb.Supplier.ABG.Models.RQs;
+using HeyTripCarWeb.Supplier.ACE.Models.RSs;
 using System.Xml.Serialization;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
@@ -6,6 +7,9 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
     [XmlRoot(ElementName = "OTA_VehRateRuleRS", Namespace = "http://www.opentravel.org/OTA/2003/05")]
     public class ABG_OTA_VehRateRuleRS
     {
+        [XmlElement("Warnings")]
+        public Warnings Warnings { get; set; }
+
         [XmlElement(ElementName = "Errors")]
         public Errors Errors { get; set; }
 
@@ -13,11 +17,56 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
         public VehRentalCore VehRentalCore { get; set; }
         public Vehicle Vehicle { get; set; }
         public RentalRate RentalRate { get; set; }
+
         public TotalCharge TotalCharge { get; set; }
         public List<PricedEquip> PricedEquips { get; set; }
         public List<PricedCoverage> PricedCoverages { get; set; }
         public LocationDetails LocationDetails { get; set; }
         public List<VendorMessage> VendorMessages { get; set; }
+    }
+
+    public class Fees
+    {
+        [XmlElement(ElementName = "Fee")]
+        public List<Fee> FeeList { get; set; }
+    }
+
+    public class Fee
+    {
+        [XmlAttribute]
+        public string CurrencyCode { get; set; }
+
+        [XmlAttribute]
+        public decimal Amount { get; set; }
+
+        [XmlAttribute]
+        public string Description { get; set; }
+
+        [XmlAttribute]
+        public bool IncludedInEstTotalInd { get; set; }
+
+        [XmlAttribute]
+        public bool IncludedInRate { get; set; }
+
+        [XmlAttribute]
+        public bool TaxInclusive { get; set; }
+
+        [XmlAttribute]
+        public string Purpose { get; set; }
+
+        public Calculation Calculation { get; set; }
+    }
+
+    public class Warnings
+    {
+        [XmlElement("Warning")]
+        public List<Warning> WarningList { get; set; }
+    }
+
+    public class Warning
+    {
+        [XmlAttribute("Code")]
+        public int Code { get; set; }
     }
 
     public class TaxAmount
@@ -70,6 +119,9 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
         [XmlAttribute]
         public string CurrencyCode { get; set; }
 
+        [XmlAttribute]
+        public bool IncludedInEstTotalInd { get; set; }
+
         public Calculation Calculation { get; set; }
         public MinMax MinMax { get; set; }
     }
@@ -85,6 +137,9 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
 
     public class PricedCoverage
     {
+        [XmlAttribute]
+        public bool Required { get; set; }
+
         public Coverage Coverage { get; set; }
         public Charge Charge { get; set; }
     }
@@ -92,7 +147,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
     public class Coverage
     {
         [XmlAttribute]
-        public string CoverageType { get; set; }
+        public int CoverageType { get; set; }
 
         [XmlAttribute]
         public string Code { get; set; }
@@ -168,6 +223,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
         [XmlAttribute]
         public string Title { get; set; }
 
+        [XmlElement(ElementName = "SubSection")]
         public List<SubSection> SubSection { get; set; }
     }
 
@@ -181,7 +237,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
 
     public class Paragraph
     {
-        public List<ListItem> ListItem { get; set; }
+        public ListItem ListItem { get; set; }
     }
 
     public class ListItem

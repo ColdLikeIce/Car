@@ -1,4 +1,6 @@
-﻿using HeyTripCarWeb.Supplier.ABG.Config;
+﻿using HeyTripCarWeb.Share;
+using HeyTripCarWeb.Share.Dtos;
+using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using HeyTripCarWeb.Supplier.ABG.Models.RSs;
 using Serilog;
@@ -12,11 +14,13 @@ namespace HeyTripCarWeb.Supplier.ABG.Util
 {
     public class ABGXmlHelper
     {
-        public static string PostRequest(string url, Envelope envelope)
+        public static string PostRequest(string url, Envelope envelope, ApiEnum type)
         {
+            var nowtime = DateTime.Now.ToString("hhMMss");
             // Serialize the object to XML
             XmlSerializer serializer = new XmlSerializer(typeof(Envelope));
             var requestXml = "";
+            var theadId = Thread.CurrentThread.ManagedThreadId;
             using (StringWriter writer = new Utf8StringWriter())
             {
                 // 使用 XmlWriterSettings 控制命名空间的定义
@@ -39,7 +43,10 @@ namespace HeyTripCarWeb.Supplier.ABG.Util
                 }
                 requestXml = writer.ToString();
             }
+            Log.Information($"postApi_{theadId}_{nowtime}:请求参数【{requestXml}】");
             string responseText = string.Empty;
+            string level = "Info";
+            string exception = "";
             HttpWebRequest request;
             WebResponse response;
             StreamReader reader;
@@ -56,10 +63,14 @@ namespace HeyTripCarWeb.Supplier.ABG.Util
                 reader = new
                 StreamReader(response.GetResponseStream());
                 responseText = reader.ReadToEnd();
+                Log.Information($"postApi_{theadId}_{nowtime}:返回结果【{responseText}】");
                 response.Close();
             }
             catch (WebException wex)
             {
+                level = "Error";
+                exception = wex.Message;
+                Log.Error($"postApi_{theadId}_{nowtime}:返回异常{wex.Message}");
                 response = wex.Response;
                 reader = new
                StreamReader(response.GetResponseStream());
@@ -68,14 +79,27 @@ namespace HeyTripCarWeb.Supplier.ABG.Util
             }
             catch (System.Exception ex)
             {
-                Log.Error($"请求接口异常{ex.Message}");
+                level = "Error";
+                exception = ex.Message;
+                Log.Error($"postApi_{theadId}_{nowtime}:返回异常{ex.Message}");
+            }
+            finally
+            {
+                LogInfo loginfo = new LogInfo
+                {
+                    tableName = "Abg_SupplierRqLogInfo",
+                    logType = LogEnum.ABG,
+                    rqInfo = requestXml,
+                    rsInfo = responseText,
+                    Level = level,
+                    exception = exception,
+                    Date = DateTime.Now,
+                    ApiType = type,
+                    theadId = theadId
+                };
+                SupplierLogInstance.Instance.Enqueue(loginfo);
             }
             return responseText;
-        }
-
-        public static string BuildRequest<T>(T model, ABGAppSetting _setting)
-        {
-            return "";
         }
 
         /// <summary>
@@ -94,7 +118,9 @@ namespace HeyTripCarWeb.Supplier.ABG.Util
             nsManager.AddNamespace("ns", "http://wsg.avis.com/wsbang");
             nsManager.AddNamespace("ota", "http://www.opentravel.org/OTA/2003/05");
             Type genericType = typeof(T);
-            var nodeName = genericType.Name;
+            XmlRootAttribute xmlRootAttr = (XmlRootAttribute)genericType.GetCustomAttributes(typeof(XmlRootAttribute), false).FirstOrDefault();
+
+            var nodeName = xmlRootAttr.ElementName;
             // 使用XPath查询OTA_VehAvailRateRS节点
             XmlNode otaNode = xmlDoc.SelectSingleNode($"//ns:Response/ota:{nodeName}", nsManager);
             if (otaNode == null)

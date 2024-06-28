@@ -159,8 +159,20 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
 
     public class Primary
     {
+        [XmlElement("PersonName")]
+        public PersonName PersonName { get; set; }
+
         [XmlElement(ElementName = "CitizenCountryName")]
         public CitizenCountryName CitizenCountryName { get; set; }
+    }
+
+    public class PersonName
+    {
+        [XmlElement("GivenName")]
+        public string GivenName { get; set; }
+
+        [XmlElement("Surname")]
+        public string Surname { get; set; }
     }
 
     public class CitizenCountryName

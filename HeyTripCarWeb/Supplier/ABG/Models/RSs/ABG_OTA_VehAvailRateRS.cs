@@ -1,4 +1,5 @@
-﻿using HeyTripCarWeb.Supplier.ACE.Models.RSs;
+﻿using HeyTripCarWeb.Supplier.ABG.Models.RQs;
+using HeyTripCarWeb.Supplier.ACE.Models.RSs;
 using System.Xml.Serialization;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 
@@ -44,6 +45,13 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
         public List<VehVendorAvail> VehVendorAvail { get; set; }
     }
 
+    [XmlRoot("Info")]
+    public class Info
+    {
+        [XmlElement("LocationDetails")]
+        public List<LocationDetails> LocationDetails { get; set; }
+    }
+
     public class VehVendorAvail
     {
         [XmlElement(ElementName = "Vendor")]
@@ -51,6 +59,9 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
 
         [XmlElement(ElementName = "VehAvails")]
         public VehAvails VehAvails { get; set; }
+
+        [XmlElement(ElementName = "Info")]
+        public Info Info { get; set; }
     }
 
     public class VehAvails
@@ -63,6 +74,21 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
     {
         [XmlElement(ElementName = "VehAvailCore")]
         public VehAvailCore VehAvailCore { get; set; }
+
+        [XmlElement(ElementName = "VehAvailInfo")]
+        public VehAvailInfo VehAvailInfo { get; set; }
+    }
+
+    public class VehAvailInfo
+    {
+        [XmlElement("PricedCoverages")]
+        public PricedCoverages PricedCoverages { get; set; }
+    }
+
+    public class PricedCoverages
+    {
+        [XmlElement("PricedCoverage")]
+        public List<PricedCoverage> PricedCoverageList { get; set; }
     }
 
     public class VehAvailCore
@@ -78,5 +104,8 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RSs
 
         [XmlElement(ElementName = "TotalCharge")]
         public TotalCharge TotalCharge { get; set; }
+
+        [XmlArrayItem("Fee")]
+        public List<Fee> Fees { get; set; }
     }
 }
