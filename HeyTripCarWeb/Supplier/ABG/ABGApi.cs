@@ -2,6 +2,7 @@
 using Dapper;
 using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
+using HeyTripCarWeb.Share.Dbs;
 using HeyTripCarWeb.Share.Dtos;
 using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ABG.Models.Dbs;
@@ -16,8 +17,10 @@ using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 using Serilog;
 using StackExchange.Redis;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -29,7 +32,6 @@ using System.Xml.Serialization;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Stds;
-using static System.Collections.Specialized.BitVector32;
 
 namespace HeyTripCarWeb.Supplier.ABG
 {
@@ -41,12 +43,12 @@ namespace HeyTripCarWeb.Supplier.ABG
     /// AUD(澳大利亚元)
     ///
     /// 支持门店码查询
-    /// 取消政策：取车前免费取消
+    /// 取消政策：取车前免费取消  noshow 取 60 EUR
     /// 燃油政策为FullToFull
     /// 政策方面接口有返回 另外根据FTP文件 落地 信用卡要求个数政策  YoungDriver政策.
     /// FTP文件落地 location(locs.dat) locationOperationTimes(Locs_hrs.dat)  YoungDriver(YoungDriver.dat)
     /// CreditCard信用卡要求个数(CreditCard.dat)
-    /// 押金：好像还需要推进 是一个范围？
+    /// 押金：好像还需要推进 是一个范围？ 押金用我们标准的万能范围：300-5000USD
     ///
     /// </summary>
     public class ABGApi : IABGApi
@@ -56,13 +58,17 @@ namespace HeyTripCarWeb.Supplier.ABG
         private readonly IRepository<AbgYoungDriver> _yourDriverRepository;
         private readonly ABGAppSetting _setting;
         private readonly IMapper _mapper;
+        private readonly IRepository<CarLocationSupplier> _supplierCatRe;
+        private readonly IRepository<CarCity> _CatCityRe;
         private readonly IRepository<ABGCarProReservation> _proOrdRepository;
         private readonly IRepository<ABGRateCache> _rateCacheRepository;
         private readonly IServiceProvider _serviceProvider;
 
         public ABGApi(IOptions<ABGAppSetting> options, IMapper mapper, IRepository<ABGLocation> locRepository,
             IRepository<ABGCarProReservation> proOrdRepository, IRepository<ABGRateCache> rateCacheRepository,
-            IServiceProvider serviceProvider, IRepository<ABG_CreditCardPolicy> cardRepository, IRepository<AbgYoungDriver> yourDriverRepository)
+            IServiceProvider serviceProvider, IRepository<ABG_CreditCardPolicy> cardRepository,
+            IRepository<AbgYoungDriver> yourDriverRepository, IRepository<CarLocationSupplier> supplierCatRe,
+            IRepository<CarCity> catCityRe)
         {
             _setting = options.Value;
             _mapper = mapper;
@@ -72,6 +78,8 @@ namespace HeyTripCarWeb.Supplier.ABG
             _serviceProvider = serviceProvider;
             _cardRepository = cardRepository;
             _yourDriverRepository = yourDriverRepository;
+            _supplierCatRe = supplierCatRe;
+            _CatCityRe = catCityRe;
         }
 
         #region 原始接口
@@ -83,14 +91,18 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <param name="availRateRQ"></param>
         /// <param name="timeout"></param>
         /// <returns></returns>
-        public async Task<List<StdVehicle>> VehAvailRate(ABG_OTA_VehAvailRateRQ availRateRQ, SupplierInfo supplierInfo, List<ABGLocation> locList, int timeout = 45000)
+        public async Task<List<StdVehicleExtend>> VehAvailRate(ABG_OTA_VehAvailRateRQ availRateRQ, QueryDto dto, int timeout = 45000)
         {
-            List<StdVehicle> result = new List<StdVehicle>();
+            var supplierInfo = dto.SupplierInfo;
+
+            var locList = dto.LocList;
+            var driverList = dto.youngDriverList;
+            List<StdVehicleExtend> result = new List<StdVehicleExtend>();
             var res = BuildEnvelope(new CommonRequest { OTA_VehAvailRateRQ = availRateRQ, Type = ApiEnum.List });
             var model = ABGXmlHelper.GetResponse<ABG_OTA_VehAvailRateRS>(res);
             if (model.Errors != null && model.Errors?.ErrorList.Count > 0)
             {
-                Log.Error($"ApiErr:{supplierInfo.DefaultIATA}{string.Join(",", model.Errors?.ErrorList.Select(n => n.Message))}");
+                Log.Information($"Apiresult:{supplierInfo.DefaultIATA}{string.Join(",", model.Errors?.ErrorList.Select(n => n.Message))}");
                 return result;
             }
             if (model == null)
@@ -110,7 +122,12 @@ namespace HeyTripCarWeb.Supplier.ABG
                     var veCore = ve.VehAvailCore;
                     if (veCore.Status == "Available")
                     {
-                        StdVehicle std = new StdVehicle();
+                        StdVehicleExtend std = new StdVehicleExtend()
+                        {
+                            supplierInfo = supplierInfo,
+                            veCore = veCore,
+                            availRateRQ = availRateRQ
+                        };
                         //门店信息
 
                         std.Supplier = EnumCarSupplier.ABG;
@@ -146,9 +163,6 @@ namespace HeyTripCarWeb.Supplier.ABG
 
                         std.PictureURL = "https://www.avis.com/car-rental/images/global/en/rentersguide/vehicle_guide/" + veCore.Vehicle.PictureURL;
                         std.TransmissionType = veCore.Vehicle.TransmissionType == "Manual" ? EnumCarTransmissionType.Manual : EnumCarTransmissionType.Automatic;
-
-                        std.MinDriverAge = 0; //userloss
-                        std.MaxDriverAge = 99; //userloss
 
                         var rentalRate = veCore.RentalRate;
                         var rateDistance = rentalRate.RateDistance;
@@ -187,7 +201,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         {
                             PayWhen = EnumCarPayWhen.NoNeed,
                             Type = EnumCarCoverageType.Deposit,
-                            Desc = "Deposit",
+                            Desc = "300-5000USD",
                             Currency = "USD",
                             Amount = 300
                         };
@@ -301,82 +315,85 @@ namespace HeyTripCarWeb.Supplier.ABG
                         //保险
                         List<StdPricedCoverage> stdPricedCoverages = new List<StdPricedCoverage>();
                         var veinfo = ve.VehAvailInfo;
-                        foreach (var pricedCoverage in veinfo.PricedCoverages?.PricedCoverageList)
+                        if (veinfo != null)
                         {
-                            var charge = pricedCoverage.Charge;
-                            var no_included = charge.IncludedInEstTotalInd == false && charge.Amount > 0;//不包含到总价
+                            foreach (var pricedCoverage in veinfo.PricedCoverages?.PricedCoverageList)
+                            {
+                                var charge = pricedCoverage.Charge;
+                                var no_included = charge.IncludedInRate == false && charge.Amount > 0;//不包含到总价
 
-                            //todel
-                            if (charge.IncludedInEstTotalInd == true)
-                            {
-                                Log.Information($"todel:【{charge.IncludedInEstTotalInd}】");
-                            }
-                            StdPricedCoverage stdPriced = new StdPricedCoverage()
-                            {
-                                Required = pricedCoverage.Required,
-                                CoverageType = BuildEnumCarCoverageType(pricedCoverage.Coverage.CoverageType),
-                                CoverageDescription = pricedCoverage.Coverage.CoverageDetails?.Description,
-                                Description = pricedCoverage.Coverage.CoverageDetails?.Description,
-                                CurrencyCode = charge.CurrencyCode,
-                                Amount = charge.Amount,
-                                TaxInclusive = charge.TaxInclusive,
-                                IncludedInRate = charge.IncludedInRate,
-                                IncludedInEstTotalInd = charge.IncludedInEstTotalInd,
+                                //todel
+                                if (charge.IncludedInEstTotalInd == true)
+                                {
+                                    Log.Information($"todel:【{charge.IncludedInEstTotalInd}】");
+                                }
+                                StdPricedCoverage stdPriced = new StdPricedCoverage()
+                                {
+                                    Required = pricedCoverage.Required,
+                                    CoverageType = BuildEnumCarCoverageType(pricedCoverage.Coverage.CoverageType),
+                                    CoverageDescription = pricedCoverage.Coverage.CoverageDetails?.Description,
+                                    Description = pricedCoverage.Coverage.CoverageDetails?.Description,
+                                    CurrencyCode = charge.CurrencyCode,
+                                    Amount = charge.Amount,
+                                    TaxInclusive = charge.TaxInclusive,
+                                    IncludedInRate = charge.IncludedInRate,
+                                    IncludedInEstTotalInd = charge.IncludedInEstTotalInd,
 
-                                MaxCharge = charge.MinMax?.MaxCharge,
-                                MinCharge = charge.MinMax?.MinCharge,
-                            };
-                            if (charge.Calculation != null)
-                            {
-                                stdPriced.Calculation = new StdCalculation
-                                {
-                                    Quantity = charge.Calculation.Quantity,
-                                    UnitName = charge.Calculation.UnitName,
-                                    UnitCharge = charge.Calculation.UnitCharge
+                                    MaxCharge = charge.MinMax?.MaxCharge,
+                                    MinCharge = charge.MinMax?.MinCharge,
                                 };
-                            }
-                            //CDW  //包含才输出（起赔额包括0：全险
-                            if (pricedCoverage.Coverage.CoverageType == 7 && !no_included && charge.Amount >= 0)
-                            {
-                                StdCurrencyAmount ocitem = new StdCurrencyAmount
+                                if (charge.Calculation != null)
                                 {
-                                    Type = EnumCarCoverageType.CollisionDamageWaiver,
-                                    PayWhen = EnumCarPayWhen.NoNeed,
-                                    Desc = pricedCoverage.Coverage.CoverageDetails?.Description,
-                                    Amount = pricedCoverage.Charge.Amount,
-                                    Currency = pricedCoverage.Charge.CurrencyCode
-                                };
-                                stdAmount.Add(ocitem);
-                            }    //TP保险 包含才输出（起赔额包括0：全险
-                            else if (pricedCoverage.Coverage.CoverageType == 48 && !no_included && charge.Amount >= 0)
-                            {
-                                StdCurrencyAmount ocitem = new StdCurrencyAmount
+                                    stdPriced.Calculation = new StdCalculation
+                                    {
+                                        Quantity = charge.Calculation.Quantity,
+                                        UnitName = charge.Calculation.UnitName,
+                                        UnitCharge = charge.Calculation.UnitCharge
+                                    };
+                                }
+                                //CDW  //包含才输出（起赔额包括0：全险
+                                if (pricedCoverage.Coverage.CoverageType == 7 && !no_included && charge.Amount >= 0)
                                 {
-                                    Type = EnumCarCoverageType.TheftProtection,
-                                    PayWhen = EnumCarPayWhen.NoNeed,
-                                    Desc = pricedCoverage.Coverage.CoverageDetails?.Description,
-                                    Amount = pricedCoverage.Charge.Amount,
-                                    Currency = pricedCoverage.Charge.CurrencyCode
-                                };
-                                stdAmount.Add(ocitem);
-                            }
-                            /* else
-                             {
-                                 //其他费用
-                                 if (no_included)
+                                    StdCurrencyAmount ocitem = new StdCurrencyAmount
+                                    {
+                                        Type = EnumCarCoverageType.CollisionDamageWaiver,
+                                        PayWhen = EnumCarPayWhen.NoNeed,
+                                        Desc = pricedCoverage.Coverage.CoverageDetails?.Description,
+                                        Amount = pricedCoverage.Charge.Amount,
+                                        Currency = pricedCoverage.Charge.CurrencyCode
+                                    };
+                                    stdAmount.Add(ocitem);
+                                }    //TP保险 包含才输出（起赔额包括0：全险
+                                else if (pricedCoverage.Coverage.CoverageType == 48 && !no_included && charge.Amount >= 0)
+                                {
+                                    StdCurrencyAmount ocitem = new StdCurrencyAmount
+                                    {
+                                        Type = EnumCarCoverageType.TheftProtection,
+                                        PayWhen = EnumCarPayWhen.NoNeed,
+                                        Desc = pricedCoverage.Coverage.CoverageDetails?.Description,
+                                        Amount = pricedCoverage.Charge.Amount,
+                                        Currency = pricedCoverage.Charge.CurrencyCode
+                                    };
+                                    stdAmount.Add(ocitem);
+                                }
+                                /* else
                                  {
-                                     StdCurrencyAmount ocitem = new StdCurrencyAmount
+                                     //其他费用
+                                     if (no_included)
                                      {
-                                         Type = EnumCarCoverageType.TheftProtection,
-                                         PayWhen = EnumCarPayWhen.NoNeed,
-                                         Desc = ("PricedCoverages" + pricedCoverage.Coverage.CoverageType + "-" + pricedCoverage.Coverage.CoverageDetails?.Description),
-                                         Amount = pricedCoverage.Charge.Amount,
-                                         Currency = pricedCoverage.Charge.CurrencyCode
-                                     };
-                                     stdAmount.Add(ocitem);
-                                 }
-                             }*/
-                            stdPricedCoverages.Add(stdPriced);
+                                         StdCurrencyAmount ocitem = new StdCurrencyAmount
+                                         {
+                                             Type = EnumCarCoverageType.TheftProtection,
+                                             PayWhen = EnumCarPayWhen.NoNeed,
+                                             Desc = ("PricedCoverages" + pricedCoverage.Coverage.CoverageType + "-" + pricedCoverage.Coverage.CoverageDetails?.Description),
+                                             Amount = pricedCoverage.Charge.Amount,
+                                             Currency = pricedCoverage.Charge.CurrencyCode
+                                         };
+                                         stdAmount.Add(ocitem);
+                                     }
+                                 }*/
+                                stdPricedCoverages.Add(stdPriced);
+                            }
                         }
                         std.PricedCoverages = stdPricedCoverages;
                         //价格
@@ -390,38 +407,6 @@ namespace HeyTripCarWeb.Supplier.ABG
                             RentalAmount = totalCharge.RateTotalAmount,
                             OtherAmounts = stdAmount
                         };
-                        var rateRule = await GetRateRule(availRateRQ, veCore, supplierInfo);
-                        if (rateRule != null)
-                        {
-                            if (rateRule.Errors != null && rateRule.Errors.ErrorList.Count > 0)
-                            {
-                                var json = JsonConvert.SerializeObject(rateRule);
-                                Log.Error($"获取Rule失败{string.Join(",", rateRule.Errors.ErrorList.Select(n => n.Message))}");
-                            }
-                            if (rateRule.Warnings != null && rateRule.Warnings.WarningList.Count > 0)
-                            {
-                                Log.Information($"usertodel$存在变价场景待处理{JsonConvert.SerializeObject(rateRule)}");
-                                //判断是否变价  Requested rate has changed
-                            }
-                            //装备
-                            var equips = rateRule.PricedEquips;
-                            List<StdPricedEquip> eqList = new List<StdPricedEquip>();
-                            foreach (var eq in equips)
-                            {
-                                StdPricedEquip stdPricedEquip = new StdPricedEquip();
-                                stdPricedEquip.EquipType = BuildPricedEquip(Convert.ToInt32(eq.Equipment.EquipType));
-
-                                stdPricedEquip.EquipDescription = "";
-                                stdPricedEquip.Unit = BuildEquipUnitType(eq.Charge.Calculation.UnitName);
-                                stdPricedEquip.Currency = eq.Charge.CurrencyCode;
-                                stdPricedEquip.UnitPrice = eq.Charge.Calculation.UnitCharge;
-                                stdPricedEquip.TaxInclusive = eq.Charge.TaxInclusive;
-                                stdPricedEquip.IncludedInEstTotalInd = eq.Charge.IncludedInEstTotalInd;
-                                eqList.Add(stdPricedEquip);
-                            }
-                            std.PricedEquips = eqList;
-                        }
-                        //usertodo
                         var startLoc = locList.FirstOrDefault(n => n.LocationCode == loc.FirstOrDefault().Code);
                         var endloc = locList.FirstOrDefault(n => n.LocationCode == loc.LastOrDefault().Code);
 
@@ -431,96 +416,69 @@ namespace HeyTripCarWeb.Supplier.ABG
                             DropOff = BuildLocationDetail(loc.LastOrDefault(), startLoc),
                             PickUp = BuildLocationDetail(loc.FirstOrDefault(), endloc),
                         };
-                        //政策信息
-                        //db政策  信用卡政策  年轻驾驶员要求
-                        List<StdTermAndCondition> termsAndConditions = new List<StdTermAndCondition>();
-                        var cardPolicy = await _cardRepository.GetByIdAsync("select * from ABG_CreditCardPolicy where AvisLocationCode=@Location and VehicleSIPPCode=@SIPPCode", new { Location = loc.FirstOrDefault().Code, SIPPCode = std.VehicleCode });
-                        if (cardPolicy != null)
-                        {
-                            StdTermAndCondition cardConfition = new StdTermAndCondition
-                            {
-                                Titel = "Credit Card Requirements",
-                                Sections = new List<StdSection>
-                                {
-                                    new StdSection{Text=$"Number of Credit Cards Required for rental is {cardPolicy.NumCreditCardsRequired}"}
-                                }
-                            };
-                            //信用卡要求个数 先不添加政策
-                            //termsAndConditions.Add(cardConfition);
-                        }
 
-                        var vendorMessages = rateRule.VendorMessages;
+                        var driverInfo = driverList.FirstOrDefault(n => n.Code == loc.FirstOrDefault()?.Code && n.CarGroup == std.VehicleCode[0].ToString());
+                        /*                        if (termsAndConditions.SelectMany(n => n.Sections).Select(s => s.Title).Contains("Age Requirements"))
+                                                {
+                                                    Log.Information($"原文已经存在驾照年龄要求");
+                                                }
+                                                else
+                                                {
+                                                    if (driverInfo != null)
+                                                    {
+                                                        StdTermAndCondition cardConfition = new StdTermAndCondition
+                                                        {
+                                                            Titel = "Age Requirements",
+                                                            Sections = new List<StdSection>
+                                                        {
+                                                            new StdSection{Text=$"The minimum age to drive a vehicle with Avis is {driverInfo?.MinimumAge} years of age. All drivers must hold a current, full and valid drivers licence, that has been valid for a minimum of 12 consecutive months. A young driver surcharge may apply."}
+                                                        }
+                                                        };
+                                                        termsAndConditions.Add(cardConfition);
+                                                    }
 
-                        foreach (var msg in vendorMessages)
-                        {
-                            List<StdSection> stdSections = new List<StdSection>();
-                            var title = msg.SubSection;
-                            foreach (var content in title)
-                            {
-                                StdSection stdSection = new StdSection
-                                {
-                                    Title = content.SubTitle,
-                                    Text = string.Join("<br />", content.Paragraph.ListItem.Text)
-                                };
-                                stdSections.Add(stdSection);
-                            }
-                            StdTermAndCondition newitem = new StdTermAndCondition
-                            {
-                                Code = msg.Title,
-                                Sections = stdSections
-                            };
-                            termsAndConditions.Add(newitem);
-                        }
-                        var driverInfo = await _yourDriverRepository.GetByIdAsync("select * from Abg_YoungDriver where Code = @Code and CarGroup = @CarGroup", new { Code = loc.FirstOrDefault().Code, CarGroup = std.VehicleCode[0] });
-                        if (termsAndConditions.SelectMany(n => n.Sections).Select(s => s.Title).Contains("Age Requirements"))
-                        {
-                            Log.Information($"原文已经存在驾照年龄要求");
-                        }
-                        else
-                        {
-                            if (driverInfo != null)
-                            {
-                                StdTermAndCondition cardConfition = new StdTermAndCondition
-                                {
-                                    Titel = "Age Requirements",
-                                    Sections = new List<StdSection>
-                                {
-                                    new StdSection{Text=$"The minimum age to drive a vehicle with Avis is {driverInfo?.MinimumAge} years of age. All drivers must hold a current, full and valid drivers licence, that has been valid for a minimum of 12 consecutive months. A young driver surcharge may apply."}
-                                }
-                                };
-                                termsAndConditions.Add(cardConfition);
-                            }
-
-                            Log.Error("driveAgetodo");
-                        }
+                                                    Log.Error("driveAgetodo");
+                                                }*/
                         if (driverInfo != null)
                         {
                             std.MinDriverAge = driverInfo.MinimumAge.HasValue ? driverInfo.MinimumAge.Value : 0;
                             std.MaxDriverAge = driverInfo.MaximumAge.HasValue ? driverInfo.MaximumAge.Value : 0;
                         }
-                        //文档说开会说免费取消
+                        //取车前免费取消  noshow 取 60 EUR
                         std.CancelPolicy = new StdCancelPolicy
                         {
-                            CancelType = EnumCarCancelType.FreeCancel,
-                            PickUpBeforeHours = 0,
+                            CancelType = EnumCarCancelType.NonCancel,
+                            Rules = new List<StdCancelRule>
+                            {
+                                new StdCancelRule
+                                {
+                                    Currency =  totalCharge.CurrencyCode,
+                                    StartTime = DateTime.Now,
+                                    EndTime = availRateRQ.VehAvailRQCore.VehRentalCore.PickUpDateTime,
+                                    DeductValue=0,
+                                },
+                                new StdCancelRule
+                                {
+                                    Currency = "EUR",
+                                    StartTime = availRateRQ.VehAvailRQCore.VehRentalCore.PickUpDateTime,
+                                    EndTime =DateTime.MaxValue,
+                                    DeductValue = 60,
+                                }
+                            }
                         };
-                        std.TermsAndConditions = termsAndConditions;
+
                         //构建ratecode这里下单需要解析出来
                         var rateCode = $"UserVerdorType_{rentCore.PickUpLocation.LocationCode}_{rentCore.ReturnLocation.LocationCode}";
                         rateCode = rateCode + $"_{veCore.Vehicle.VehType.VehicleCategory}_{veCore.Vehicle.VehClass.Size}";
                         rateCode = rateCode + $"_{std.VehicleCode}_{veCore.RentalRate.RateQualifier.RateCategory}";
                         rateCode = rateCode + $"_{veCore.RentalRate.RateQualifier.RateQualifierValue}";
-                        if (rateRule.Errors != null && rateRule.Errors.ErrorList.Count > 0)
-                        {
-                            var json = JsonConvert.SerializeObject(rateRule);
-                            Log.Error($"获取Rule失败{string.Join(",", rateRule.Errors.ErrorList.Select(n => n.Message))}");
-                        }
+
                         std.RateCode = rateCode;
                         //result.Add(std);
                         //根据不同的支付类型生成两条记录
                         foreach (var supplier in supplierInfo.secSuppliers)
                         {
-                            var newItem = _mapper.Map<StdVehicle, StdVehicle>(std);
+                            var newItem = _mapper.Map<StdVehicleExtend, StdVehicleExtend>(std);
                             newItem.TotalCharge.PayType = supplier.PayType;
                             newItem.RateCode = newItem.RateCode.Replace("UserVerdorType", supplier.VerdorType.ToString());
                             result.Add(newItem);
@@ -529,6 +487,93 @@ namespace HeyTripCarWeb.Supplier.ABG
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// 请求rateRule规则 构建 TermsAndConditions实体
+        /// </summary>
+        /// <returns></returns>
+        public async Task BuildTermsAndConditions(StdVehicleExtend std)
+        {
+            try
+            {
+                var rateRule = await GetRateRule(std.availRateRQ, std.veCore, std.supplierInfo);
+                if (rateRule != null)
+                {
+                    List<StdTermAndCondition> termsAndConditions = new List<StdTermAndCondition>();
+                    if (rateRule.Errors != null && rateRule.Errors.ErrorList.Count > 0)
+                    {
+                        var json = JsonConvert.SerializeObject(rateRule);
+                        Log.Error($"获取Rule失败{string.Join(",", rateRule.Errors.ErrorList.Select(n => n.Message))}");
+                    }
+                    if (rateRule.Warnings != null && rateRule.Warnings.WarningList.Count > 0)
+                    {
+                        Log.Information($"usertodel$存在变价场景待处理{JsonConvert.SerializeObject(rateRule)}");
+                        //判断是否变价  Requested rate has changed
+                    }
+                    //装备
+                    var equips = rateRule.PricedEquips;
+                    List<StdPricedEquip> eqList = new List<StdPricedEquip>();
+                    foreach (var eq in equips)
+                    {
+                        StdPricedEquip stdPricedEquip = new StdPricedEquip();
+                        stdPricedEquip.EquipType = BuildPricedEquip(Convert.ToInt32(eq.Equipment.EquipType));
+
+                        stdPricedEquip.EquipDescription = "";
+                        stdPricedEquip.Unit = BuildEquipUnitType(eq.Charge.Calculation.UnitName);
+                        stdPricedEquip.Currency = eq.Charge.CurrencyCode;
+                        stdPricedEquip.UnitPrice = eq.Charge.Calculation.UnitCharge;
+                        stdPricedEquip.TaxInclusive = eq.Charge.TaxInclusive;
+                        stdPricedEquip.IncludedInEstTotalInd = eq.Charge.IncludedInEstTotalInd;
+                        eqList.Add(stdPricedEquip);
+                    }
+                    std.PricedEquips = eqList;
+                    //政策信息
+                    //db政策  信用卡政策  年轻驾驶员要求
+                    /*      var cardPolicy = await _cardRepository.GetByIdAsync("select * from ABG_CreditCardPolicy where AvisLocationCode=@Location and VehicleSIPPCode=@SIPPCode", new { Location = loc.FirstOrDefault().Code, SIPPCode = std.VehicleCode });
+                          if (cardPolicy != null)
+                          {
+                              StdTermAndCondition cardConfition = new StdTermAndCondition
+                              {
+                                  Titel = "Credit Card Requirements",
+                                  Sections = new List<StdSection>
+                                  {
+                                      new StdSection{Text=$"Number of Credit Cards Required for rental is {cardPolicy.NumCreditCardsRequired}"}
+                                  }
+                              };
+                              //信用卡要求个数 先不添加政策
+                              //termsAndConditions.Add(cardConfition);
+                          }
+    */
+                    var vendorMessages = rateRule.VendorMessages;
+
+                    foreach (var msg in vendorMessages)
+                    {
+                        List<StdSection> stdSections = new List<StdSection>();
+                        var title = msg.SubSection;
+                        foreach (var content in title)
+                        {
+                            StdSection stdSection = new StdSection
+                            {
+                                Title = content.SubTitle,
+                                Text = string.Join("<br />", content.Paragraph.ListItem.Text)
+                            };
+                            stdSections.Add(stdSection);
+                        }
+                        StdTermAndCondition newitem = new StdTermAndCondition
+                        {
+                            Code = msg.Title,
+                            Sections = stdSections
+                        };
+                        termsAndConditions.Add(newitem);
+                    }
+                    std.TermsAndConditions = termsAndConditions;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"构建政策失败{ex.Message}");
+            }
         }
 
         public async Task GetLocationDetail(SupplierInfo supper, LocationDetails loc)
@@ -626,7 +671,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                     CountryCode = db_loc.LocationName,
                     CountryName = loc.Address.CountryName.Name,
                     StateProv = loc.Address.StateProv?.Name,
-                    StateCode = loc.Address.StateProv.StateCode,
+                    StateCode = loc.Address.StateProv?.StateCode,
                     CityName = db_loc.City,
                     Address = db_loc.Address,
                     PostalCode = loc.Address.PostalCode,
@@ -704,15 +749,14 @@ namespace HeyTripCarWeb.Supplier.ABG
                     return EnumCarEquipType.InfantSeat;
 
                 case 147: //路边服务 Curbside Service
-                    Log.Information($"usertodel:出现路边服务");
-                    return EnumCarEquipType.ExtraPickupPrice;
+
+                    return EnumCarEquipType.None;
 
                 case 8:
                     return EnumCarEquipType.CST;
 
                 case 157:
-                    Log.Information($"usertodel:Emergency Sickness Protection");
-                    return EnumCarEquipType.ExtraPickupPrice;
+                    return EnumCarEquipType.None;
 
                 case 13:
                     return EnumCarEquipType.GPS;
@@ -756,8 +800,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                 case 171:
                     return EnumCarEquipType.Baby_Stroller;
             }
-            Log.Information($"usertodel:出现路边服务[{type}]");
-            return EnumCarEquipType.ExtraPickupPrice;
+            Log.Information($"usertodel:出现没有匹配到的设备类型[{type}]");
+            return EnumCarEquipType.None;
         }
 
         /// <summary>
@@ -925,7 +969,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                     return EnumCarVehicleCategory.Pickup;
             }
             Log.Error($"遇到其他车型{category}");
-            return EnumCarVehicleCategory.Car;
+            return EnumCarVehicleCategory.None;
         }
 
         public async Task<StdCreateOrderRS> CreateOrderAsync(StdCreateOrderRQ originModel, SecSupplier supplier, ABG_OTA_VehResRQ createOrderRQ, int timeout = 15000)
@@ -1013,14 +1057,14 @@ namespace HeyTripCarWeb.Supplier.ABG
                 result.Message = string.Join(",", spModel.Errors.ErrorList.Select(n => n.Message));
                 return result;
             }
-            await _proOrdRepository.UpdateBySqlAsync("update ABG_CarProReservation set CancelTime=@CancelTime,OrderStatus=@OrderStatus " +
-                "where orderno = @orderno", new { CancelTime = DateTime.Now, OrderStatus = "cancelled", orderno = order.OrderNo });
 
             if (spModel.VehCancelRSCore.CancelStatus == "Cancelled")
             {
                 result.Currency = order.CurrencyCode;
 
                 result.CancelSuc = true;
+                await _proOrdRepository.UpdateBySqlAsync("update ABG_CarProReservation set CancelTime=@CancelTime,OrderStatus=@OrderStatus " +
+                "where orderno = @orderno", new { CancelTime = DateTime.Now, OrderStatus = "cancelled", orderno = order.OrderNo });
             }
             else
             {
@@ -1029,7 +1073,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             return result;
         }
 
-        public async Task<StdQueryOrderRS> QueryOrderAsync(ABG_OTA_VehRetResRQ postdata, int timeout = 1500)
+        public async Task<StdQueryOrderRS> QueryOrderAsync(ABGCarProReservation order, ABG_OTA_VehRetResRQ postdata, int timeout = 1500)
         {
             StdQueryOrderRS result = new StdQueryOrderRS();
             var res = BuildEnvelope(new CommonRequest { ABG_OTA_VehRetResRQ = postdata, Type = ApiEnum.Detail });
@@ -1038,13 +1082,19 @@ namespace HeyTripCarWeb.Supplier.ABG
             {
                 throw new Exception($"解析实体错误{res}");
             }
+
             if (spModel.Errors != null && spModel.Errors.ErrorList.Count > 0)
             {
                 Log.Error($"查询订单出错{string.Join(",", spModel.Errors.ErrorList.Select(n => n.Message))}");
-                if (spModel.Errors.ErrorList.Select(n => n.Message).Contains("31005"))
+                if (spModel.Errors.ErrorList.Exists(n => n.ShortText.Contains("31005")))
                 {
                     result.IsSuccess = true;
                     result.SuppOrderStatus = "cancelled";
+                    result.SuppOrderId = order.ReservationId;
+                    result.Currency = order.CurrencyCode;
+                    result.Amount = order.EstimatedTotalAmount.Value;
+                    result.SIPP = order.SIPP;
+                    result.OrigData = res;
                     result.Status = EnumCarReservationStatus.Cancelled;
                 }
                 else
@@ -1068,11 +1118,14 @@ namespace HeyTripCarWeb.Supplier.ABG
 
         #region 业务接口
 
-        private SemaphoreSlim semaphore = new SemaphoreSlim(1);
+        /// <summary>
+        /// 开多个线程 最多5个
+        /// </summary>
+        private SemaphoreSlim semaphore = new SemaphoreSlim(10);
 
-        private async Task<List<StdVehicle>> GetVehiclesByloc(QueryDto dto)
+        private async Task<List<StdVehicleExtend>> GetVehiclesByloc(QueryDto dto)
         {
-            List<StdVehicle> result = new List<StdVehicle>();
+            List<StdVehicleExtend> result = new List<StdVehicleExtend>();
             try
             {
                 await semaphore.WaitAsync();
@@ -1138,7 +1191,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         }
                     }
                 };
-                var rqList = await VehAvailRate(availRateRQ, dto.SupplierInfo, dto.LocList);
+                var rqList = await VehAvailRate(availRateRQ, dto);
                 result.AddRange(rqList);
             }
             catch (Exception ex)
@@ -1160,20 +1213,29 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <returns></returns>
         public async Task<List<StdVehicle>> GetVehiclesAsync(StdGetVehiclesRQ vehicleRQ, int timeout = 45000)
         {
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
             List<StdVehicle> res = new List<StdVehicle>();
             try
             {
-                var cache_key = $"{vehicleRQ.PickUpLocationCode}_{vehicleRQ.PickUpDateTime.ToString("yyyy-MM-ddTHH:mm:ss")}_{vehicleRQ.ReturnLocationCode}_{vehicleRQ.ReturnDateTime.ToString("yyyy-MM-ddTHH:mm:ss")}";//"HK_2024-04-28T10:00:00_BKK_2024-05-01T10:00:00_BKK_30"
-                var md5Key = Md5Helper.ComputeMD5Hash(cache_key);
-                var dbModel = await _rateCacheRepository.GetByIdAsync("select * from ABG_RateCache where SearchMD5 = @SearchMD5", new { SearchMD5 = md5Key });
-                if (dbModel != null && dbModel.ExpireTime > DateTime.Now)
+                var dbModel = new ABGRateCache();
+                var cache_key = "";
+                var md5Key = "";
+                //根据配置确定有没有缓存
+                if (_setting.PassMin > 0)
                 {
-                    var cache = GZipHelper.DecompressString(dbModel.RateCache);
-                    //修改缓存
-                    await _rateCacheRepository.UpdateBySqlAsync("update ABG_RateCache set searchcount=searchcount+1 where SearchMD5 = @SearchMD5", new { SearchMD5 = md5Key });
-                    return JsonConvert.DeserializeObject<List<StdVehicle>>(cache);
+                    cache_key = $"{vehicleRQ.PickUpLocationCode}_{vehicleRQ.PickUpDateTime.ToString("yyyy-MM-ddTHH:mm:ss")}_{vehicleRQ.ReturnLocationCode}_{vehicleRQ.ReturnDateTime.ToString("yyyy-MM-ddTHH:mm:ss")}";//"HK_2024-04-28T10:00:00_BKK_2024-05-01T10:00:00_BKK_30"
+                    md5Key = Md5Helper.ComputeMD5Hash(cache_key);
+                    dbModel = await _rateCacheRepository.GetByIdAsync("select * from ABG_RateCache where SearchMD5 = @SearchMD5", new { SearchMD5 = md5Key });
+                    if (dbModel != null && dbModel.ExpireTime > DateTime.Now)
+                    {
+                        var cache = GZipHelper.DecompressString(dbModel.RateCache);
+                        //修改缓存
+                        await _rateCacheRepository.UpdateBySqlAsync("update ABG_RateCache set searchcount=searchcount+1 where SearchMD5 = @SearchMD5", new { SearchMD5 = md5Key });
+                        return JsonConvert.DeserializeObject<List<StdVehicle>>(cache);
+                    }
                 }
-
+                List<StdVehicleExtend> firstList = new List<StdVehicleExtend>();
                 var locList = await _locRepository.GetAllAsync();
                 List<ABGLocation> startLocList = new List<ABGLocation>();
                 List<ABGLocation> endLocList = new List<ABGLocation>();
@@ -1227,14 +1289,17 @@ namespace HeyTripCarWeb.Supplier.ABG
                 {
                     return res;//暂不支持
                 }
+
+                var youngDriverList = await _yourDriverRepository.GetAllAsync();
                 //usertodo 需要改成并发
                 var iataList = _setting.SupplierInfos;
+                int batchSize = 20; // 限制 10个任务跑
                 List<Task> runTasks = new List<Task>();
                 foreach (var iata in iataList)
                 {
-                    var supplierSloc = startLocList.Where(n => n.VendorName == iata.Vendor);
+                    var supplierSloc = startLocList.Where(n => n.VendorName == iata.Vendor).ToList();
 
-                    var supplierRLoc = endLocList.Where(n => n.VendorName == iata.Vendor);
+                    var supplierRLoc = endLocList.Where(n => n.VendorName == iata.Vendor).ToList();
                     foreach (var start in supplierSloc)
                     {
                         if (vehicleRQ.PickUpLocationCode == vehicleRQ.ReturnLocationCode)
@@ -1248,47 +1313,67 @@ namespace HeyTripCarWeb.Supplier.ABG
                                 ReturnLocationCode = start.LocationCode,
                                 DriverAge = vehicleRQ.DriverAge,
                                 CitizenCountryCode = vehicleRQ.CitizenCountryCode,
-                                LocList = locList
+                                LocList = locList,
+                                youngDriverList = youngDriverList
                             };
                             var task = Task.Run(async () =>
                             {
                                 var rq = await GetVehiclesByloc(queryDto);
-                                res.AddRange(rq);
+                                firstList.AddRange(rq);
                             });
                             runTasks.Add(task);
-                            continue;
+                            if (runTasks.Count > batchSize)
+                            {
+                                await Task.WhenAll(runTasks);
+                                runTasks = new List<Task>();
+                            }
                         }
-                        foreach (var end in supplierRLoc)
+                        else
                         {
-                            QueryDto queryDto = new QueryDto
+                            foreach (var end in supplierRLoc)
                             {
-                                SupplierInfo = iata,
-                                PickUpDateTime = vehicleRQ.PickUpDateTime,
-                                ReturnDateTime = vehicleRQ.ReturnDateTime,
-                                PickUpLocationCode = start.LocationCode,
-                                ReturnLocationCode = end.LocationCode,
-                                DriverAge = vehicleRQ.DriverAge,
-                                CitizenCountryCode = vehicleRQ.CitizenCountryCode,
-                                LocList = locList
-                            };
-                            var task = Task.Run(async () =>
-                            {
-                                var rq = await GetVehiclesByloc(queryDto);
-                                res.AddRange(rq);
-                            });
-                            runTasks.Add(task);
+                                QueryDto queryDto = new QueryDto
+                                {
+                                    SupplierInfo = iata,
+                                    PickUpDateTime = vehicleRQ.PickUpDateTime,
+                                    ReturnDateTime = vehicleRQ.ReturnDateTime,
+                                    PickUpLocationCode = start.LocationCode,
+                                    ReturnLocationCode = end.LocationCode,
+                                    DriverAge = vehicleRQ.DriverAge,
+                                    CitizenCountryCode = vehicleRQ.CitizenCountryCode,
+                                    LocList = locList,
+                                    youngDriverList = youngDriverList
+                                };
+                                var task = Task.Run(async () =>
+                                {
+                                    var rq = await GetVehiclesByloc(queryDto);
+                                    firstList.AddRange(rq);
+                                });
+                                runTasks.Add(task);
+                                if (runTasks.Count > batchSize)
+                                {
+                                    await Task.WhenAll(runTasks);
+                                    runTasks = new List<Task>();
+                                }
+                            }
                         }
                     }
                 }
                 await Task.WhenAll(runTasks);
-                if (res.Count > 0)
+                //并发请求raterule规则构建实体
+                Parallel.ForEach(firstList, async item =>
+                {
+                    await BuildTermsAndConditions(item);
+                    // 在这里执行一些操作
+                });
+                if (_setting.PassMin > 0 && res.Count > 0)
                 {
                     var dbCache = GZipHelper.Compress(JsonConvert.SerializeObject(res));
                     var rateMD5 = Md5Helper.ComputeMD5Hash(dbCache);
                     if (dbModel != null)
                     {
                         await _rateCacheRepository.UpdateBySqlAsync("update ABG_RateCache set searchcount=searchcount+1,RateMD5=@RateMD5,RateCache=@RateCache,PreUpdateTime=updatetime,updatetime=@updatetime,ExpireTime=@ExpireTime where SearchMD5=@SearchMD5",
-                            new { RateMD5 = rateMD5, RateCache = dbCache, updatetime = DateTime.Now, ExpireTime = DateTime.Now.AddMinutes(10), SearchMD5 = md5Key });
+                            new { RateMD5 = rateMD5, RateCache = dbCache, updatetime = DateTime.Now, ExpireTime = DateTime.Now.AddMinutes(_setting.PassMin), SearchMD5 = md5Key });
                     }
                     else
                     {
@@ -1307,7 +1392,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         await _rateCacheRepository.InsertAsync(aCERateCache);
                     }
                 }
-
+                res = _mapper.Map<StdVehicleExtend, StdVehicle>(firstList);
                 return res;
             }
             catch (Exception ex)
@@ -1317,6 +1402,8 @@ namespace HeyTripCarWeb.Supplier.ABG
             }
             finally
             {
+                stopwatch.Stop();
+                Log.Information($"sum{stopwatch.ElapsedMilliseconds}");
                 //插入日志
                 Task.Run(async () =>
                 {
@@ -1372,7 +1459,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         Vendor = new Vendor { CompanyShortName = proOrder.VendorName },
                     }
                 };
-                return await QueryOrderAsync(postData);
+                return await QueryOrderAsync(proOrder, postData);
             }
             catch (Exception ex)
             {
@@ -1476,7 +1563,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                 {
                     throw new Exception("供应商解析不正确");
                 }
-
+                var dbOrder = await _proOrdRepository.GetByIdAsync("select * from ABG_CarProReservation where orderno = @orderid", new { orderid = createOrderRQ.OrderNo });
+                if (dbOrder != null)
+                {
+                    return new StdCreateOrderRS()
+                    {
+                        OrderSuc = false,
+                        SuppOrderId = dbOrder.ReservationId,
+                        Message = $"已存在订单{dbOrder.OrderNo}"
+                    };
+                }
                 var postModel = new ABG_OTA_VehResRQ
                 {
                     Version = "1.0",
@@ -1571,6 +1667,7 @@ namespace HeyTripCarWeb.Supplier.ABG
 
         public async Task<bool> InitLocation()
         {
+            //await RunLoation();
             await PushLocationToDb();
             return true;
         }
@@ -1579,20 +1676,106 @@ namespace HeyTripCarWeb.Supplier.ABG
         {
             var locList = await _locRepository.GetAllAsync();
             var list = locList.ToList();
-            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Supplier/ABG/Doc/Avis/Locs_hrs.dat");
-            await BuildLocationOperationTimes(path, list);
-            var budgePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Supplier/ABG/Doc/Budget/B_Locs_hrs.dat");
-            await BuildLocationOperationTimes(budgePath, list);
+            foreach (var item in _setting.SupplierInfos)
+            {
+                var dbList = await _locRepository.GetAllAsync();
+                var filename = "Locs_hrs.dat";
+                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}/{filename}");
+                await BuildLocationOperationTimes(path, list);
+            }
             return true;
+        }
+
+        /// <summary>
+        /// todooooo
+        /// </summary>
+        /// <returns></returns>
+        public async Task InitSupplierLocaiton()
+        {
+            var spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.ABG });
+            var allCity = await _CatCityRe.GetAllAsync();
+            var locList = await _locRepository.GetAllAsync();
+            foreach (var item in locList)
+            {
+                /* if (item.Latitude == null || item.Longitude == null)
+                 {
+                     continue;
+                 }*/
+                var vendor = (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(item.VendorName);
+                var spModel = spLoc.FirstOrDefault(n => n.SuppLocId == item.LocationCode && n.Vendor == vendor);
+                var cityid = 0;
+                if (!String.IsNullOrWhiteSpace(item.City))
+                {
+                    var city = allCity.FirstOrDefault(n => n.CityNameEn.ToLower() == item.City.ToLower());
+                    if (city != null)
+                    {
+                        cityid = city.CityId;
+                    }
+                }
+                if (spModel == null)
+                {
+                    CarLocationSupplier newitem = new CarLocationSupplier
+                    {
+                        LocationName = item.LocationName,
+                        CountryCode = "US",
+                        CountryName = "",
+                        CityId = cityid,
+                        CityName = item.City,
+                        Address = item.Address,
+                        Latitude = item.Latitude,
+                        Longitude = item.Longitude,
+                        Airport = string.IsNullOrWhiteSpace(item.APOCode) ? false : true,
+                        AirportCode = item.APOCode,
+                        RailwayStation = item.RentalType == "Railway/Bus Station" ? true : false,
+                        PostalCode = item.Postcode,
+                        Telephone = item.PhoneNumber,
+                        Email = item.Email,
+                        OperationTime = item.OperationTimes,
+                        Supplier = ((int)EnumCarSupplier.ABG).ToString(),
+                        SuppLocId = item.LocationCode,
+                        Vendor = (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(item.VendorName),
+                        VendorLocId = item.LocationCode,
+                        CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    };
+                    await _supplierCatRe.InsertAsync(newitem);
+                }
+                else
+                {
+                    spModel.LocationName = item.LocationName;
+                    spModel.CityId = cityid;
+                    spModel.CityName = item.City;
+                    spModel.Address = item.Address;
+                    spModel.Latitude = item.Latitude;
+                    spModel.Longitude = item.Longitude;
+                    spModel.Airport = string.IsNullOrWhiteSpace(item.APOCode) ? false : true;
+                    spModel.AirportCode = item.APOCode;
+                    spModel.RailwayStation = item.RentalType == "Railway/Bus Station" ? true : false;
+                    spModel.PostalCode = item.Postcode;
+                    spModel.Telephone = item.PhoneNumber;
+                    spModel.Email = item.Email;
+                    spModel.OperationTime = item.OperationTimes;
+                    spModel.Supplier = ((int)EnumCarSupplier.ABG).ToString();
+                    spModel.SuppLocId = item.LocationCode;
+                    spModel.Vendor = (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(item.VendorName);
+                    spModel.VendorLocId = item.LocationCode;
+                    spModel.CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    spModel.UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    await _supplierCatRe.UpdateAsync(spModel);
+                }
+            }
         }
 
         public async Task PushLocationToDb()
         {
             //待改成 批量插入
-            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Supplier/ABG/Doc/Avis/Locs.dat");
-            await BuildLocationByFile(path, "Avis");
-            var budgetpath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Supplier/ABG/Doc/Budget/B_Locs.dat");
-            await BuildLocationByFile(budgetpath, "Budget");
+            foreach (var item in _setting.SupplierInfos)
+            {
+                var dbList = await _locRepository.GetAllAsync();
+                var filename = "Locs.dat";
+                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}/{filename}");
+                await BuildLocationByFile(path, item.Vendor, dbList);
+            }
         }
 
         /// <summary>
@@ -1601,7 +1784,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <param name="path"></param>
         /// <param name="companyName"></param>
         /// <returns></returns>
-        public async Task BuildLocationByFile(string path, string companyName)
+        public async Task BuildLocationByFile(string path, string companyName, List<ABGLocation> locList)
         {
             //如果文件存在
             if (File.Exists(path))
@@ -1616,54 +1799,42 @@ namespace HeyTripCarWeb.Supplier.ABG
                     }
                     try
                     {
-                        var spiltLine = item.Split("\t");
-                        ABGLocation location = new ABGLocation
+                        var spiltLine = item.Split("\t").ToList();
+                        if (spiltLine.Count <= 27)
                         {
-                            LocationCode = spiltLine[1],
-                            LocationName = spiltLine[2],
-                            RegionCode = spiltLine[3],
-                            RegionName = spiltLine[4],
-                            RentalType = spiltLine[5],
-                            Latitude = spiltLine[6],
-                            Longitude = spiltLine[7],
-                            PhoneNumber = spiltLine[8],
-                            AlternativePhoneNumber = spiltLine[9],
-                            GeoIndicator = spiltLine[10],
-                            OutsideReturn = spiltLine[11],
-                            HasSkiRack = spiltLine[12],
-                            HasSnowTyres = spiltLine[13],
-                            HasSnowChains = spiltLine[14],
-                            HasChildSeat = spiltLine[15],
-                            HasRoofLuggage = spiltLine[16],
-                            HasHandControl = spiltLine[17],
-                            IsGPS = spiltLine[18],
-                            AvisPreferred = spiltLine[19],
-                            ShuttleServiceAvailable = spiltLine[20],
-                            RoadServiceAvailable = spiltLine[21],
+                            List<string> newList = new List<string>();
+                            for (var i = 0; i < spiltLine.Count; i++)
+                            {
+                                if (i == 21)
+                                {
+                                    newList.Add("");
+                                }
+                                newList.Add(spiltLine[i]);
+                            }
+                            spiltLine = newList;
+                        }
+                        ABGLocation location = new ABGLocation();
+                        SetPropertiesFromArray(location, spiltLine, 1);
 
-                            VendorName = companyName,
-                            CreateTime = DateTime.Now,
-                            IsDeleted = 0
-                        };
-                        if (spiltLine.Length <= 27)
+                        location.VendorName = companyName;
+                        var dbModel = locList.FirstOrDefault(n => n.LocationCode == location.LocationCode);
+                        var hashKey = GZipHelper.GetSHA256Hash(item);
+                        location.hashKey = hashKey;
+                        if (dbModel == null)
                         {
-                            location.Email = spiltLine[21];
-                            location.Address = spiltLine[22];
-                            location.City = spiltLine[23];
-                            location.Postcode = spiltLine[24];
-                            location.APOCode = spiltLine[25];
-                            location.CollectionAvailable = spiltLine[26];
+                            location.CreateTime = DateTime.Now;
+
+                            await _locRepository.InsertAsync(location);
                         }
                         else
                         {
-                            location.Email = spiltLine[22];
-                            location.Address = spiltLine[23];
-                            location.City = spiltLine[24];
-                            location.Postcode = spiltLine[25];
-                            location.APOCode = spiltLine[26];
-                            location.CollectionAvailable = spiltLine[27];
+                            if (dbModel.hashKey != hashKey)
+                            {
+                                location.LocationCode = dbModel.LocationCode;
+                                location.UpdateTime = DateTime.Now;
+                                await _locRepository.UpdateAsync(location, "CreateTime,OperationTimes");
+                            }
                         }
-                        await _locRepository.InsertAsync(location);
                     }
                     catch (Exception ex)
                     {
@@ -1717,11 +1888,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                     {
                         var spiltLine = item.Split("\t");
                         List<StdOperationTime> all = new List<StdOperationTime>();
-                        all.Add(new StdOperationTime
-                        {
-                            Week = EnumCarWeek.Sunday,
-                            Times = BuildStdTime(spiltLine, 3)
-                        });
+
                         all.Add(new StdOperationTime
                         {
                             Week = EnumCarWeek.Monday,
@@ -1752,8 +1919,19 @@ namespace HeyTripCarWeb.Supplier.ABG
                             Week = EnumCarWeek.Saturday,
                             Times = BuildStdTime(spiltLine, 27)
                         });
+                        all.Add(new StdOperationTime
+                        {
+                            Week = EnumCarWeek.Sunday,
+                            Times = BuildStdTime(spiltLine, 3)
+                        });
                         var json = JsonConvert.SerializeObject(all);
-                        await _locRepository.UpdateBySqlAsync($"update abg_location_new set OperationTimes=@json  where locationcode = @locationcode", new { json = json, locationcode = spiltLine[1] });
+                        var hashKey = GZipHelper.GetSHA256Hash(json);
+                        var dbmodel = locList.FirstOrDefault(n => n.LocationCode == spiltLine[1]);
+                        if (dbmodel != null && dbmodel.operationtimehashkey != hashKey)
+                        {
+                            await _locRepository.UpdateBySqlAsync($"update abg_location_new set OperationTimes=@json,operationtimehashkey=@hashkey  where locationcode = @locationcode", new { json = json, locationcode = spiltLine[1], hashkey = hashKey });
+                            Log.Information($"update 【{spiltLine[1]}】OperationTimes success!");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -1772,13 +1950,10 @@ namespace HeyTripCarWeb.Supplier.ABG
             //待改成 批量插入
             foreach (var item in _setting.SupplierInfos)
             {
+                var dbList = await _cardRepository.GetAllAsync();
                 var filename = "CreditCard.dat";
-                if (item.Vendor == "Budget")
-                {
-                    filename = "B_CreditCard.dat";
-                }
-                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Supplier/ABG/Doc/{item.Vendor}/{filename}");
-                await BuildCreditCardPolicyByFile(path);
+                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}/{filename}");
+                await BuildCreditCardPolicyByFile(path, dbList);
             }
         }
 
@@ -1787,7 +1962,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task BuildCreditCardPolicyByFile(string path)
+        public async Task BuildCreditCardPolicyByFile(string path, List<ABG_CreditCardPolicy> dbList)
         {
             //如果文件存在
             if (File.Exists(path))
@@ -1805,13 +1980,27 @@ namespace HeyTripCarWeb.Supplier.ABG
                         var spiltLine = item.Split("\t").ToList();
                         ABG_CreditCardPolicy aBG_CreditCard = new ABG_CreditCardPolicy();
                         SetPropertiesFromArray(aBG_CreditCard, spiltLine, 0);
-
-                        aBG_CreditCard.CreatTime = DateTime.Now;
-                        if (string.IsNullOrWhiteSpace(aBG_CreditCard.AvisLocationCode))
+                        var dbmodel = dbList.FirstOrDefault(n => n.AvisLocationCode == aBG_CreditCard.AvisLocationCode && n.AvisCarGroup == aBG_CreditCard.AvisCarGroup);
+                        var hashKey = GZipHelper.GetSHA256Hash(item);
+                        aBG_CreditCard.hashkey = hashKey;
+                        if (dbmodel == null)
                         {
-                            continue;
+                            aBG_CreditCard.CreatTime = DateTime.Now;
+                            if (string.IsNullOrWhiteSpace(aBG_CreditCard.AvisLocationCode))
+                            {
+                                continue;
+                            }
+                            await _cardRepository.InsertAsync(aBG_CreditCard);
                         }
-                        await _cardRepository.InsertAsync(aBG_CreditCard);
+                        else
+                        {
+                            if (dbmodel.hashkey != hashKey)
+                            {
+                                aBG_CreditCard.ID = dbmodel.ID;
+
+                                await _cardRepository.UpdateAsync(aBG_CreditCard, "CreatTime");
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -1827,21 +2016,20 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <returns></returns>
         public async Task InitYoungDriver()
         {
-            FTPDownLoad();
-            return;
+            //FTPDownLoad();
+            //找出所有的db
+            var dbList = await _yourDriverRepository.GetAllAsync();
             foreach (var item in _setting.SupplierInfos)
             {
                 var filename = "YoungDriver.dat";
-                if (item.Vendor == "Budget")
-                {
-                    filename = "B_YoungDriver.dat";
-                }
-                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Supplier/ABG/Doc/{item.Vendor}/{filename}");
-                await InitYoungDriverByFile(path);
+                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}/{filename}");
+                await InitYoungDriverByFile(path, dbList);
             }
         }
 
-        public async Task InitYoungDriverByFile(string path)
+        public const string datPath = "Supplier/ABG/Data";
+
+        public async Task InitYoungDriverByFile(string path, List<AbgYoungDriver> list)
         {
             //如果文件存在
             if (File.Exists(path))
@@ -1868,7 +2056,19 @@ namespace HeyTripCarWeb.Supplier.ABG
                         }
                         AbgYoungDriver youngDriver = new AbgYoungDriver();
                         SetPropertiesFromArray(youngDriver, spiltLine, 1);
-                        await _yourDriverRepository.InsertAsync(youngDriver);
+                        var enHash = GZipHelper.GetSHA256Hash(item);
+                        var dbModel = list.FirstOrDefault(n => n.Code == youngDriver.Code && n.CarGroup == youngDriver.CarGroup);
+                        if (dbModel == null)
+                        {
+                            youngDriver.HashKey = enHash;
+                            await _yourDriverRepository.InsertAsync(youngDriver);
+                        }
+                        else
+                        {
+                            youngDriver.ID = dbModel.ID;
+                            await _yourDriverRepository.UpdateAsync(dbModel);
+                            //update todo
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -1941,11 +2141,11 @@ namespace HeyTripCarWeb.Supplier.ABG
             }
         }
 
-        public void FTPDownLoad()
+        public async Task FTPInit()
         {
             foreach (var item in _setting.SupplierInfos)
             {
-                var descpath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Supplier/ABG/Data/{item.Vendor}");
+                var descpath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}");
                 if (!Directory.Exists(descpath))
                 {
                     // Ensure local folder path exists
@@ -1954,13 +2154,67 @@ namespace HeyTripCarWeb.Supplier.ABG
                 var filesToDownload = item.FTP.FTPFiles;
                 foreach (var f in filesToDownload)
                 {
-                    var oSource = $"{item.FTP.FTPUrl}/{f}";
-                    FTPHelper.DownloadFile(item.FTP.FTPUrl, "", item.FTP.Name, item.FTP.PassWord);
+                    var ofile = $"{item.FTP.FTPUrl}/{f}";
+                    var descfilename = $"{descpath}/{f}";
+                    FTPHelper.DownloadFile(ofile, descfilename, item.FTP.Name, item.FTP.PassWord);
+                }
+            }
+            // 落地门店
+            await InitLocation();
+            await InitLocationOperationTimes();
+            await InitSupplierLocaiton();
+            await InitCreditCardPolicy();
+            await InitYoungDriver();
+        }
+
+        #endregion FTP落地数据 location, Location Opening Times
+
+        #region
+
+        public async Task RunLoation()
+        {
+            var location = await _locRepository.GetAllAsync();
+            var iataList = _setting.SupplierInfos;
+            List<StdVehicle> res = new List<StdVehicle>();
+            int batchSize = 10; // 限制 10个任务跑
+            List<Task> runTasks = new List<Task>();
+            var youngDriverList = await _yourDriverRepository.GetAllAsync();
+            foreach (var loc in location)
+            {
+                foreach (var iata in iataList)
+                {
+                    QueryDto queryDto = new QueryDto
+                    {
+                        SupplierInfo = iata,
+                        PickUpDateTime = DateTime.Now.AddDays(60),
+                        ReturnDateTime = DateTime.Now.AddDays(61),
+                        PickUpLocationCode = loc.LocationCode,
+                        ReturnLocationCode = loc.LocationCode,
+                        // DriverAge = vehicleRQ.DriverAge,
+                        CitizenCountryCode = "US",
+                        LocList = location,
+                        youngDriverList = youngDriverList
+                    };
+                    var task = Task.Run(async () =>
+                    {
+                        var rq = await GetVehiclesByloc(queryDto);
+                        res.AddRange(rq);
+                    });
+                    runTasks.Add(task);
+                    if (runTasks.Count > batchSize)
+                    {
+                        await Task.WhenAll(runTasks);
+                        runTasks = new List<Task>();
+                    }
+                    if (res.Count > 0)
+                    {
+                        var ssss = 2323;
+                    }
                 }
             }
         }
 
-        #endregion FTP落地数据 location, Location Opening Times
+        #endregion
     }
 }
 

@@ -43,5 +43,6 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
         public string? SlovakMaximumAgeSurcharge { get; set; }
         public DateTime? CreateTime { get; set; }
         public DateTime? UpdateTime { get; set; }
+        public string HashKey { get; set; } // 存文本的哈希值 有变化再做更新
     }
 }

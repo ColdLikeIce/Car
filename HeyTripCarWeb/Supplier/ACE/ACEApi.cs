@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic.FileIO;
 using Newtonsoft.Json;
 using Serilog;
+using StackExchange.Redis;
 using System;
 using System.Drawing;
 using System.Net;
@@ -29,11 +30,15 @@ namespace HeyTripCarWeb.Supplier.ACE
     /// 结算价包含：EstimatedTotalAmount。
     /// 结算价字段：EstimatedTotalAmount。
     /// 预付产品，底价模式。加15个点
-    /// 美元结算(月结)。
+    ///
     ///
     ///
     /// 支持机场三字码 六位位置码 连锁店代码
     /// 设备即将被淘汰。请尽量避免让他们使用这一项功能，但在此期间，设备信息确实包含在车辆位置详情（VehLocDetails）中
+    ///
+    ///
+    ///
+    ///
     /// </summary>
     public class ACEApi : IACEApi
     {
@@ -503,8 +508,11 @@ RuleType=""3"" />
                             std.Supplier = EnumCarSupplier.None;
                             std.Vendor = EnumCarVendor.ACE_Rent_A_Car;
                             std.VehicleCode = veCore.Vehicle?.Code;
-                            std.ProductCode = $"ACE_usertodo_{std.VehicleCode}";
+
                             std.VehicleName = veCore.Vehicle?.VehMakeModel?.Name;
+                            //车型组
+                            std.VehicleGroup = (EnumCarVehicleGroup)SIPPHelper.SIPPCodeAnalysis(std.VehicleCode, 3);
+
                             std.DoorCount = BuildDoorCount(veCore.Vehicle.VehType.DoorCount);
                             //VehicleCategory 必须等于以下之一：1（轿车）、2（面包车）、3（SUV）、4（敞篷车）、
                             //8（旅行车）或 9（皮卡）
@@ -535,27 +543,13 @@ RuleType=""3"" />
                                 Quantity = rateDistance.Quantity,
                                 VehiclePeriodUnitName = (EnumCarPeriodUnitName)Enum.Parse(typeof(EnumCarPeriodUnitName), rateDistance.VehiclePeriodUnitName)
                             };
-                            //Purpose枚举值 目的设置为：1租车2单程费用5升级5机场/城市/其他附加费5机场特许费5年龄附加费
-                            //6额外距离收费6车辆登记费6以色列印花税7地方税7奥地利合同税7货物和服务税
-                            //8额外里程/额外距离收费9额外10额外一周10天11小时13年龄附加费22预支付费用
-                            //28可选费用
-                            if (rentalRate.RateDistance.Unlimited == false)
-                            {
-                                var charges = rentalRate.VehicleCharges.Where(n => n.Purpose == "6").ToList();
-                                if (charges.Count > 0)
-                                {
-                                    Log.Information($"charges数量为{charges}");
-                                    rateinfo.Currency = charges.FirstOrDefault().CurrencyCode;
-                                    rateinfo.Amount = charges.FirstOrDefault().Amount;
-                                    rateinfo.Description = charges.FirstOrDefault().Description;
-                                }
-                            }
+
                             std.RateDistance = rateinfo;
                             //价格
                             var totalEl = veCore.TotalCharge;
                             var totalCharge = new StdTotalCharge
                             {
-                                PayType = EnumCarPayType.Prepaid, //到付 usertodo RuleType
+                                PayType = EnumCarPayType.Prepaid, // 预付
                                 PriceType = EnumCarPriceType.NetRate, //底价模式
                                 Currency = totalEl.CurrencyCode,
                                 TotalAmount = totalEl.EstimatedTotalAmount,
@@ -563,34 +557,18 @@ RuleType=""3"" />
                             };
                             //其他费用
                             List<StdCurrencyAmount> stdAmount = new List<StdCurrencyAmount>();
-                            var FeesList = veCore.Fees;
-
-                            foreach (var item in FeesList)
+                            veCore.Fees?.ToList().ForEach(f =>
                             {
-                                StdCurrencyAmount stdCurrencyAmount = new StdCurrencyAmount
+                                std.Fees.Add(new StdFee()
                                 {
-                                    Type = EnumCarCoverageType.MEDIUM, //usertodo
-                                    //PayWhen = //usertodo
-                                    Desc = item.Description,
-                                    Currency = item.CurrencyCode,
-                                    Amount = item.Amount
-                                };
-                                stdAmount.Add(stdCurrencyAmount);
-                            }
-                            //押金添加进来
-                            var payRule = ve.VehAvailInfo.PaymentRules;
-                            if (payRule.Count > 0)
-                            {
-                                StdCurrencyAmount red = new StdCurrencyAmount
-                                {
-                                    Type = EnumCarCoverageType.Deposit,
-                                    Desc = "",
-                                    Currency = payRule.FirstOrDefault().CurrencyCode,
-                                    Amount = payRule.FirstOrDefault().Amount,
-                                    PayWhen = EnumCarPayWhen.DropOff,
-                                };
-                                stdAmount.Add(red);
-                            }
+                                    Description = f.Description,
+                                    CurrencyCode = f.CurrencyCode,
+                                    Amount = f.Amount,
+                                    //TaxInclusive = !(f.TaxInclusive == false),
+                                    //IncludedInRate = !(f. == false),
+                                    IncludedInEstTotalInd = !(f.IncludedInEstTotalInd == false)
+                                });
+                            });
                             //设备信息
                             var equips = veCore.PricedEquips;
 
@@ -619,6 +597,7 @@ RuleType=""3"" />
                             {
                                 var charge = pricedCoverage.Charge;
                                 var code = pricedCoverage.Coverage.Code;
+                                var no_included = charge.IncludedInEstTotalInd == false && charge.Amount > 0;//不包含到总价
                                 StdPricedCoverage stdPriced = new StdPricedCoverage()
                                 {
                                     CoverageType = BuildEnumCarCoverageType(pricedCoverage.Coverage.Code),
@@ -639,27 +618,31 @@ RuleType=""3"" />
                                     MinCharge = pricedCoverage.Deductible.Amount,  //起赔额
                                 };
                                 stdPricedCoverages.Add(stdPriced);
-                                if (stdPriced.CoverageType == EnumCarCoverageType.CollisionDamageWaiver)
+                                if (stdPriced.CoverageType == EnumCarCoverageType.CollisionDamageWaiver || stdPriced.CoverageType == EnumCarCoverageType.ThirdPartyLiability)
                                 {
-                                    StdCurrencyAmount otherAmount = new StdCurrencyAmount
+                                    if (!no_included && charge.Amount >= 0)//包含才输出（起赔额包括0：全险）
                                     {
-                                        Type = EnumCarCoverageType.CollisionDamageWaiver,
-                                        Desc = stdPriced.Description,
-                                        Currency = stdPriced.CurrencyCode,
-                                        Amount = stdPriced.Amount,
-                                        PayWhen = EnumCarPayWhen.PickUp, //usertodo
-                                    };
-                                    stdAmount.Add(otherAmount);
+                                        StdCurrencyAmount otherAmount = new StdCurrencyAmount
+                                        {
+                                            Type = stdPriced.CoverageType,
+                                            Desc = stdPriced.Description,
+                                            Currency = stdPriced.CurrencyCode,
+                                            Amount = stdPriced.Amount,
+                                            PayWhen = EnumCarPayWhen.NoNeed,
+                                        };
+                                        stdAmount.Add(otherAmount);
+                                    }
                                 }
-                                if (stdPriced.CoverageType == EnumCarCoverageType.ThirdPartyLiability)
+                                else if (pricedCoverage.Required && charge.Amount > 0 && !charge.IncludedInEstTotalInd)
                                 {
+                                    //如果强制要求消费但是没有包含总价
                                     StdCurrencyAmount otherAmount = new StdCurrencyAmount
                                     {
-                                        Type = EnumCarCoverageType.ThirdPartyLiability,
+                                        Type = stdPriced.CoverageType,
                                         Desc = stdPriced.Description,
                                         Currency = stdPriced.CurrencyCode,
                                         Amount = stdPriced.Amount,
-                                        PayWhen = EnumCarPayWhen.PickUp, //usertodo
+                                        PayWhen = EnumCarPayWhen.NoNeed,
                                     };
                                     stdAmount.Add(otherAmount);
                                 }
@@ -682,47 +665,75 @@ RuleType=""3"" />
                                     Log.Information($"燃油政策:{JsonConvert.SerializeObject(fuelPolicy)}");
                                 }
                             }
-                            //
+                            List<StdVehicleCharge> vehCharges = new List<StdVehicleCharge>();
+                            var vehChargesList = rentalRate.VehicleCharges;
+
+                            //车辆收费
+                            var vehicleChargesList = vehChargesList.ToList();
+                            foreach (var item in vehicleChargesList)
+                            {
+                                Log.Information($"车辆收费信息{JsonConvert.SerializeObject(item)}");
+                                var no_included = item.IncludedInEstTotalInd == false && item.Amount > 0;//不包含到总价
+                                var purpose = EnumCarCoverageType.None;
+
+                                if (item.Purpose == "original")//原始供应商租车币种价格
+                                {
+                                    purpose = EnumCarCoverageType.VehicleRentalAmount;
+                                    std.TotalCharge.AddOtherAmount(EnumCarCoverageType.VehicleRentalAmount, EnumCarPayWhen.NoNeed, item.CurrencyCode, item.Amount);
+                                }
+                                else if (item.Purpose == "preferred")//发票币种金额
+                                {
+                                    purpose = EnumCarCoverageType.VehicleRentalPreferredAmount;
+                                    std.TotalCharge.AddOtherAmount(EnumCarCoverageType.VehicleRentalPreferredAmount, EnumCarPayWhen.NoNeed, item.CurrencyCode, item.Amount);
+                                }
+                                else if (item.Purpose == "Estimated deposit amount")
+                                {
+                                    purpose = EnumCarCoverageType.Deposit;//押金
+                                    if (no_included)
+                                    {
+                                        std.TotalCharge.AddOtherAmount(EnumCarCoverageType.Deposit, EnumCarPayWhen.NoNeed, item.CurrencyCode, item.Amount);
+                                    }
+                                }
+                                else if (item.Purpose == "2")
+                                {
+                                    purpose = EnumCarCoverageType.OneWayFee;
+                                }
+                                else if (item.Purpose == "8")
+                                {
+                                    purpose = EnumCarCoverageType.LimitedMileageInformation;
+                                    std.RateDistance.Currency = item.CurrencyCode;
+                                    std.RateDistance.Amount = item.Amount;
+                                    std.RateDistance.Description = item.Description;
+                                }
+                                else
+                                {
+                                }
+
+                                StdVehicleCharge newItem = new StdVehicleCharge
+                                {
+                                    Purpose = purpose,
+                                    PurposeDescription = item.Description,
+                                    Description = item.Description,
+                                    CurrencyCode = item.CurrencyCode,
+                                    Amount = item.Amount,
+                                    IncludedInEstTotalInd = item.IncludedInEstTotalInd,
+                                    TaxInclusive = item.TaxInclusive,
+                                };
+                                if (item.Calculation != null)
+                                {
+                                    var calculation = _mapper.Map<Calculation, StdCalculation>(item.Calculation);
+                                    newItem.Calculation = calculation;
+                                }
+                                vehCharges.Add(newItem);
+                            }
+                            std.VehicleCharges = vehCharges;
+                            // 费率规则
                             var rateRule = await GetRateRule(veCore);
                             if (rateRule != null)
                             {
-                                List<StdVehicleCharge> vehCharges = new List<StdVehicleCharge>();
-                                var vehChargesList = rentalRate.VehicleCharges;
-                                //费率
-
-                                List<StdFee> stdfee = new List<StdFee>();
-                                foreach (var fe in FeesList)
-                                {
-                                    var stdFee = _mapper.Map<Fee, StdFee>(fe);
-                                    stdfee.Add(stdFee);
-                                }
-                                std.Fees = stdfee;
-                                //车辆收费
-                                var vehicleChargesList = vehChargesList.ToList();
-                                foreach (var item in vehicleChargesList)
-                                {
-                                    Log.Information($"车辆收费信息{JsonConvert.SerializeObject(item)}");
-
-                                    StdVehicleCharge newItem = new StdVehicleCharge
-                                    {
-                                        Purpose = EnumCarCoverageType.OtherTaxesAndServiceCharges,
-                                        PurposeDescription = item.Description,
-                                        Description = item.Description,
-                                        CurrencyCode = item.CurrencyCode,
-                                        Amount = item.Amount,
-                                        IncludedInEstTotalInd = item.IncludedInEstTotalInd,
-                                        TaxInclusive = item.TaxInclusive,
-                                    };
-                                    if (item.Calculation != null)
-                                    {
-                                        var calculation = _mapper.Map<Calculation, StdCalculation>(item.Calculation);
-                                        newItem.Calculation = calculation;
-                                    }
-                                    vehCharges.Add(newItem);
-                                }
-                                std.VehicleCharges = vehCharges;
                                 //取车地点 还车地点
                                 var loc = rateRule.LocationDetails.FirstOrDefault();
+                                std.ProductCode = $"ACE_{loc.Code}_{std.VehicleCode}";
                                 var startLoc = BuildLocationDetail(loc);
                                 var stdLoc = new StdLocation { PickUp = startLoc };
                                 if (rateRule.LocationDetails.Count > 1)
@@ -861,24 +872,62 @@ RuleType=""3"" />
         /// <returns></returns>
         public EnumCarCoverageType BuildEnumCarCoverageType(string code)
         {
-            if (code.Contains("CDW"))
+            switch (code)
             {
-                return EnumCarCoverageType.CollisionDamageWaiver;
+                case "CDW":
+                case "CDW-RL":
+                    return EnumCarCoverageType.CollisionDamageWaiver;
+
+                case "ALI":
+                    return EnumCarCoverageType.LiabilityInsuranceSupplement;
+
+                case "BLI":
+                    return EnumCarCoverageType.BaseExcess;
+
+                case "CCP":
+                    return EnumCarCoverageType.MaxCover;
+
+                case "GTW":
+                    return EnumCarCoverageType.WWI;
+
+                case "IDW":
+                case "LDW-D":
+                    return EnumCarCoverageType.LossDamageWaiver;
+
+                case "PDW":
+                    Log.Information($"usertodel出现pdw");
+                    return EnumCarCoverageType.None;
+
+                case "PAC":
+                    return EnumCarCoverageType.PersonalEffectsCoverage;
+
+                case "PAI":
+                    return EnumCarCoverageType.PersonalAccidentInsurance;
+
+                case "PEC":
+                    return EnumCarCoverageType.PersonalEffectsCoverage;
+
+                case "RLP":
+                    Log.Information($"usertodel出现RLP");
+                    return EnumCarCoverageType.None;
+
+                case "RSP":
+                    return EnumCarCoverageType.RSA;
+
+                case "COV-SP":
+                    Log.Information($"usertodel出现COV-SP");
+                    return EnumCarCoverageType.None;
+
+                case "SLI":
+                    return EnumCarCoverageType.SupplementaryLiabilityInsurance;
+
+                case "TPW":
+                    return EnumCarCoverageType.TheftProtection;
+
+                case "3PI":
+                    return EnumCarCoverageType.ThirdPartyLiability;
             }
-            else if (code.Contains("TPW"))
-            {
-                return EnumCarCoverageType.TheftProtection;
-            }
-            else if (code.Contains("3PI"))
-            {
-                return EnumCarCoverageType.ThirdPartyLiability;
-            }
-            else if (code.Contains("CCP"))
-            {
-                Log.Information($"CCP保险");
-                return EnumCarCoverageType.BaseExcess;
-            }
-            Log.Information($"出现其他保险类型{code}");
+            Log.Information($"usertodel出现{code}");
             return EnumCarCoverageType.None;
         }
 
@@ -1510,7 +1559,7 @@ DefaultInd=""true"" />
         /// <param name="cancelOrderRQ"></param>
         /// <param name="timeout"></param>
         /// <returns></returns>
-        public async Task<StdCancelOrderRS> CancelOrderAsync(ACE_OTAVehCancelRQ cancelOrderRQ, int timeout = 15000)
+        public async Task<StdCancelOrderRS> CancelOrderAsync(AceReservation order, ACE_OTAVehCancelRQ cancelOrderRQ, int timeout = 15000)
         {
             StdCancelOrderRS result = new StdCancelOrderRS();
 
@@ -1667,6 +1716,7 @@ DefaultInd=""true"" />
             {
                 Log.Error($"查询订单出错{string.Join(",", spModel.Errors.ErrorList.Select(n => n.Message))}");
                 result.CancelSuc = false;
+                result.Message = string.Join(",", spModel.Errors.ErrorList.Select(n => n.Message));
                 return result;
             }
             if (spModel.CancelRSCore.CancelStatus == "Cancelled")
@@ -1675,6 +1725,8 @@ DefaultInd=""true"" />
                 result.Currency = spModel.CancelRSInfo.VehReservation.VehSegmentCore.TotalCharge.CurrencyCode;
 
                 result.CancelSuc = true;
+                await _aceOrderRepository.UpdateBySqlAsync("update Ace_CarProReservation set CancelTime=@CancelTime,OrderStatus=@OrderStatus " +
+                      "where orderno = @orderno", new { CancelTime = DateTime.Now, OrderStatus = "cancelled", orderno = order.OrderNo });
             }
             else
             {
@@ -1690,6 +1742,15 @@ DefaultInd=""true"" />
 
         public async Task<StdCancelOrderRS> CancelOrderAsync(StdCancelOrderRQ cancelOrderRQ, int timeout = 15000)
         {
+            var proOrder = await _aceOrderRepository.GetByIdAsync("select * from ace_CarProReservation where orderNo = @orderNo", new { orderNo = cancelOrderRQ.OrderNo });
+            if (proOrder == null)
+            {
+                return new StdCancelOrderRS
+                {
+                    CancelSuc = false,
+                    Message = "找不到对应的供应商订单"
+                };
+            }
             var postData = new ACE_OTAVehCancelRQ
             {
                 TimeStamp = DateTime.Now,
@@ -1715,7 +1776,7 @@ DefaultInd=""true"" />
                     }
                 }
             };
-            return await CancelOrderAsync(postData);
+            return await CancelOrderAsync(proOrder, postData);
         }
 
         /// <summary>
@@ -1822,23 +1883,21 @@ DefaultInd=""true"" />
             List<string> returnLocCodes = new List<string>();
             var alllocList = await _locRepository.GetAllAsync();
             //usertodo 先根据locationcode找出门店 现在只处理机场
-            if (vehicleRQ.PickUpLocationType == EnumCarLocationType.Airport)
+            if (vehicleRQ.PickUpLocationType == EnumCarLocationType.Airport
+                    && vehicleRQ.ReturnLocationType == EnumCarLocationType.Airport)
             {
-                var pickuploc = alllocList.Where(n => n.AirportCode == vehicleRQ.PickUpLocationCode);
-                pickupLocCodes.AddRange(pickuploc.Select(n => n.LocationCode));
+                pickupLocCodes.Add(vehicleRQ.PickUpLocationCode);
+                returnLocCodes.Add(vehicleRQ.ReturnLocationCode);
             }
-            if (vehicleRQ.ReturnLocationType == EnumCarLocationType.Airport)
+            else if (vehicleRQ.PickUpLocationType == EnumCarLocationType.City
+                    && vehicleRQ.ReturnLocationType == EnumCarLocationType.City)
             {
-                var pickuploc = alllocList.Where(n => n.AirportCode == vehicleRQ.ReturnLocationCode);
-                returnLocCodes.AddRange(pickuploc.Select(n => n.LocationCode));
+                //usertodo
             }
-            if (pickupLocCodes.Count == 0)
+            else
             {
-                throw new Exception("找不到对应的门店");
-            }
-            if (returnLocCodes.Count == 0)
-            {
-                returnLocCodes = pickupLocCodes;
+                //咱不兼容
+                return result;
             }
             foreach (var pickCode in pickupLocCodes)
             {
@@ -1868,8 +1927,8 @@ DefaultInd=""true"" />
                                 PickUpDateTime = Convert.ToDateTime(vehicleRQ.PickUpDateTime),
                                 ReturnDateTime = Convert.ToDateTime(vehicleRQ.ReturnDateTime),
                                 //出发地 目的地方
-                                PickUpLocation = new PickUpLocation { LocationCode = vehicleRQ.PickUpLocationCode },
-                                ReturnLocation = new PickUpLocation { LocationCode = vehicleRQ.ReturnLocationCode }
+                                PickUpLocation = new PickUpLocation { LocationCode = pickCode },
+                                ReturnLocation = new PickUpLocation { LocationCode = rtCode }
                             }
                         }
                     };

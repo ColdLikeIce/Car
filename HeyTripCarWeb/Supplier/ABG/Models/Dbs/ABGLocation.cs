@@ -7,6 +7,10 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
     public class ABGLocation
     {
         // 必填字段
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int LocationId { get; set; }
+
         public string LocationCode { get; set; }  // 租车点代码
 
         public string LocationName { get; set; }  // 租车点名称
@@ -45,5 +49,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
         public DateTime? UpdateTime { get; set; }       // 更新时间
         public int IsDeleted { get; set; }              // 是否已删除
         public string OperationTimes { get; set; }
+        public string hashKey { get; set; }
+        public string operationtimehashkey { get; set; }
     }
 }

@@ -16,16 +16,22 @@
     public enum LogEnum
     {
         ABG = 1,
-        ACE = 2
+        ACE = 2,
+        Bargin = 3,
+        Sixt = 4,
     }
 
     public enum ApiEnum
     {
+        None = -1,
         List = 0,
         Rule = 1,
         Create = 2,
         Cancel = 3,
         Detail = 4,
-        Location = 5
+        Location = 5,
+        SixtCreateConfig = 6,
+        SixtUpdateOfferConfig = 7,
+        SixtCountry = 8
     }
 }

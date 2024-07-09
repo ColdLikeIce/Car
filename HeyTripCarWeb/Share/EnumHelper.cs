@@ -14,7 +14,7 @@ namespace HeyTripCarWeb.Share
         {
             try
             {
-                return (T)Enum.Parse(typeof(T), str);
+                return (T)Enum.Parse(typeof(T), str,true);
             }
             catch (Exception ex)
             {

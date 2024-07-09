@@ -70,5 +70,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
         /// 最后更新时间
         /// </summary>
         public DateTime? Updatetime { get; set; }
+
+        public string hashkey { get; set; }
     }
 }

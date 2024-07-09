@@ -20,11 +20,15 @@ namespace HeyTripCarWeb.Share
             switch (type)
             {
                 case LogEnum.ABG:
-                    tableName = "Abg_SupplierRqLogInfo";
+                    tableName = "Abg_RqLogInfo";
                     break;
 
                 case LogEnum.ACE:
-                    tableName = "ACE_SupplierRqLogInfo";
+                    tableName = "Ace_RqLogInfo";
+                    break;
+
+                case LogEnum.Sixt:
+                    tableName = "Sixt_RqLogInfo";
                     break;
             }
             var sql = $"INSERT INTO {tableName} (date,theadId,reqType, level, rqinfo,rsinfo,exception) VALUES ";
@@ -46,8 +50,10 @@ namespace HeyTripCarWeb.Share
 
                 parameters.Add(date, item.Date);
                 parameters.Add(theadId, item.theadId);
-                parameters.Add(rqtype, item.ApiType);
+                parameters.Add(rqtype, item.ApiType.ToString());
                 parameters.Add(level, item.Level);
+                //压缩一下
+                item.rsInfo = GZipHelper.Compress(item.rsInfo);
                 parameters.Add(rqinfo, item.rqInfo);
                 parameters.Add(rsinfo, item.rsInfo);
                 parameters.Add(exception, item.exception);

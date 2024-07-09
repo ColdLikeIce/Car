@@ -1,4 +1,5 @@
-﻿using HeyTripCarWeb.Supplier.ABG.Config;
+﻿using HeyTripCarWeb.Share.Dbs;
+using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ABG.Models.Dbs;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.Dtos
@@ -36,5 +37,9 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dtos
         public string CitizenCountryCode { get; set; }
 
         public List<ABGLocation> LocList { get; set; }
+        public List<AbgYoungDriver> youngDriverList { get; set; }
+        public CarLocationSupplier startLoc { get; set; }
+        public CarLocationSupplier endLoc { get; set; }
+        public string SixtToken { get; set; }
     }
 }

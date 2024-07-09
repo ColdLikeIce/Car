@@ -11,5 +11,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         Task InitCreditCardPolicy();
 
         Task InitYoungDriver();
+
+        Task FTPInit();
     }
 }

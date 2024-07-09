@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace HeyTripCarWeb.Share
@@ -37,6 +38,20 @@ namespace HeyTripCarWeb.Share
                         return Encoding.UTF8.GetString(outputStream.ToArray());
                     }
                 }
+            }
+        }
+
+        public static string GetSHA256Hash(string input)
+        {
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("x2"));
+                }
+                return builder.ToString();
             }
         }
     }

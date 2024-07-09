@@ -1,4 +1,7 @@
-﻿using System.Net;
+﻿using Microsoft.Extensions.Hosting;
+using Renci.SshNet;
+using Serilog;
+using System.Net;
 
 namespace HeyTripCarWeb.Share
 {
@@ -6,26 +9,38 @@ namespace HeyTripCarWeb.Share
     {
         public static void DownloadFile(string ftpFilePath, string localFilePath, string ftpUsername, string ftpPassword)
         {
-            FtpWebRequest request = (FtpWebRequest)WebRequest.Create(ftpFilePath);
-            request.Method = WebRequestMethods.Ftp.DownloadFile;
-            request.Credentials = new NetworkCredential(ftpUsername, ftpPassword);
-
             try
             {
-                using (FtpWebResponse response = (FtpWebResponse)request.GetResponse())
+                // 创建 ConnectionInfo 对象，并设置连接超时时间
+                var connectionInfo = new Renci.SshNet.ConnectionInfo("securetransfer.avis-europe.com", 22, ftpUsername,
+                    new PasswordAuthenticationMethod(ftpUsername, ftpPassword))
                 {
-                    using (Stream responseStream = response.GetResponseStream())
+                    Timeout = TimeSpan.FromMinutes(10) // 设置连接超时时间为3分钟
+                };
+                using (var client = new SftpClient(connectionInfo))
+                {
+                    client.Connect();
+
+                    if (client.IsConnected)
                     {
-                        using (FileStream fileStream = new FileStream(localFilePath, FileMode.Create))
+                        using (Stream fileStream = File.Create(localFilePath))
                         {
-                            responseStream.CopyTo(fileStream);
+                            client.DownloadFile(ftpFilePath, fileStream);
                         }
+
+                        Log.Information($"Downloaded file '{ftpFilePath}' to '{localFilePath}' successfully.");
                     }
+                    else
+                    {
+                        Log.Error("Failed to connect to the SFTP server.");
+                    }
+
+                    client.Disconnect();
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to download file {ftpFilePath}: {ex.Message}", ex);
+                Log.Error($"An error occurred: {ex.Message}");
             }
         }
     }

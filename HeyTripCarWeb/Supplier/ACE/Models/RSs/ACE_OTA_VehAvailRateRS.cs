@@ -99,6 +99,9 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.RSs
 
     public class PricedCoverage
     {
+        [XmlAttribute]
+        public bool Required { get; set; }
+
         public Coverage Coverage { get; set; }
         public VehicleCharge Charge { get; set; }
         public Deductible Deductible { get; set; }

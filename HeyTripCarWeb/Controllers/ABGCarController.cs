@@ -1,6 +1,10 @@
 using HeyTripCarWeb.Share;
+using HeyTripCarWeb.Share.Dtos;
 using HeyTripCarWeb.Supplier.ABG;
+using HeyTripCarWeb.Supplier.ABG.Config;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using XiWan.Car.BusinessShared.Stds;
 
 namespace HeyTripCarWeb.Controllers
@@ -11,9 +15,22 @@ namespace HeyTripCarWeb.Controllers
     {
         private readonly IABGApi _carSupplierApi;
 
-        public ABGCarController(IABGApi carSupplierApi)
+        private readonly JwtHelper _jwtHelper;
+        private readonly JwtConfig _config;
+
+        public ABGCarController(IABGApi carSupplierApi, IOptions<JwtConfig> options, JwtHelper jwtHelper)
         {
             _carSupplierApi = carSupplierApi;
+            _jwtHelper = jwtHelper;
+            _config = options.Value;
+            _jwtHelper = jwtHelper;
+        }
+
+        [HttpPost("GetToken")]
+        public ActionResult<TokenModelRes> GetTokenAsync(TokenModelQue vehicleRQ, int timeout = 15000)
+        {
+            string token = _jwtHelper.CreateToken(timeout, vehicleRQ.Account, vehicleRQ.Password, _config);
+            return new TokenModelRes { ExpireTime = DateTime.Now.AddSeconds(timeout), Token = token };
         }
 
         [HttpPost("GetVehicles")]
@@ -40,32 +57,10 @@ namespace HeyTripCarWeb.Controllers
             return await _carSupplierApi.QueryOrderAsync(dto);
         }
 
-        [HttpGet("InitLocation")]
-        public async Task<bool> InitLocation()
+        [HttpGet("Init")]
+        public async Task Init()
         {
-            return await _carSupplierApi.InitLocation();
-        }
-
-        [HttpGet("InitLocationOperationTimes")]
-        public async Task<bool> InitLocationOperationTimes()
-        {
-            return await _carSupplierApi.InitLocationOperationTimes();
-        }
-
-        [HttpGet("InitCreditCardPolicy")]
-        public async Task InitCreditCardPolicy()
-        {
-            await _carSupplierApi.InitCreditCardPolicy();
-        }
-
-        [HttpGet("InitYoungDriver")]
-        public async Task InitYoungDriver()
-        {
-            await _carSupplierApi.InitYoungDriver();
-        }
-
-        public async Task DownLoadFtpFile()
-        {
+            await _carSupplierApi.FTPInit();
         }
     }
 }

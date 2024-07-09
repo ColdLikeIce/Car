@@ -1,5 +1,6 @@
 ﻿using Dapper;
 using Microsoft.Data.SqlClient;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Reflection;
@@ -28,13 +29,20 @@ namespace HeyTripCarWeb.Db
         public async Task<T> GetByIdAsync(object id)
         {
             var tableName = await GetTableName<T>();
-            var query = $"SELECT * FROM {tableName} WHERE Id = @Id";
+            var propertyInfo = typeof(T).GetProperties().FirstOrDefault(p => IsKeyProperty(p));
+            var query = $"SELECT * FROM {tableName} WHERE {propertyInfo.Name} = @Id";
             return await _dbConnection.QueryFirstOrDefaultAsync<T>(query, new { Id = id });
         }
 
         public async Task<T> GetByIdAsync(string sql, object par)
         {
             return await _dbConnection.QueryFirstOrDefaultAsync<T>(sql, par);
+        }
+
+        public async Task<List<T>> GetListBySqlAsync(string sql, object par)
+        {
+            var queryData = await _dbConnection.QueryAsync<T>(sql, par);
+            return queryData.ToList();
         }
 
         public async Task<int> UpdateBySqlAsync(string sql, object par)
@@ -61,10 +69,29 @@ namespace HeyTripCarWeb.Db
             return await _dbConnection.ExecuteAsync(query, entity);
         }
 
-        public async Task<int> UpdateAsync(T entity)
+        public async Task<int> InsertOrUpdate(T entity, string ignoreStr = "")
         {
-            var tableName = typeof(T).Name;
-            var query = GenerateUpdateQuery(tableName, entity);
+            var tableName = await GetTableName<T>();
+            var propertyInfo = typeof(T).GetProperties().FirstOrDefault(p => IsKeyProperty(p));
+            if (propertyInfo != null)
+            {
+                var value = propertyInfo.GetValue(entity);
+                if (value != null && value.ToString() != "0")
+                {
+                    await UpdateAsync(entity, ignoreStr);
+                }
+                else
+                {
+                    await InsertAsync(entity);
+                }
+            }
+            return 1;
+        }
+
+        public async Task<int> UpdateAsync(T entity, string ignoreStr = "")
+        {
+            var tableName = await GetTableName<T>();
+            var query = GenerateUpdateQuery(tableName, entity, ignoreStr);
             return await _dbConnection.ExecuteAsync(query, entity);
         }
 
@@ -95,11 +122,40 @@ namespace HeyTripCarWeb.Db
             return identityAttribute != null && identityAttribute.DatabaseGeneratedOption == System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity;
         }
 
-        private string GenerateUpdateQuery(string tableName, T entity)
+        /// <summary>
+        /// 排除Key属性
+        /// </summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
+        private bool IsKeyProperty(PropertyInfo property)
+        {
+            return property.GetCustomAttributes<KeyAttribute>().Any();
+        }
+
+        /// <summary>
+        /// 更新主键
+        /// </summary>
+        /// <param name="tableName"></param>
+        /// <param name="entity"></param>
+        /// <returns></returns>
+        private string GenerateUpdateQuery(string tableName, T entity, string ignoreStr)
         {
             var properties = typeof(T).GetProperties();
+            var key = properties.Where(p => IsKeyProperty(p) || IsIdentityProperty(p)) // 排除自增属性
+                               .FirstOrDefault();
+            properties = properties.Where(p => !IsKeyProperty(p) && !IsIdentityProperty(p)) // 排除自增属性
+                               .ToArray();
+            if (!string.IsNullOrWhiteSpace(ignoreStr))
+            {
+                var ignore = ignoreStr.Split(",").ToList();
+                if (ignore != null && ignore.Count() > 0)
+                {
+                    properties = properties.Where(n => !ignore.Contains(n.Name)).ToArray();
+                }
+            }
+
             var setClause = string.Join(", ", properties.Select(p => $"{p.Name} = @{p.Name}"));
-            return $"UPDATE {tableName} SET {setClause} WHERE Id = @Id";
+            return $"UPDATE {tableName} SET {setClause} WHERE {key.Name} = @{key.Name}";
         }
     }
 }
