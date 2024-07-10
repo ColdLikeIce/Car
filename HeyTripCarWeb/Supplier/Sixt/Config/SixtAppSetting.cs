@@ -8,5 +8,6 @@
         public string clientSecret { get; set; }
         public string CorporateCustomerNumber { get; set; }
         public string AgencyNumber { get; set; }
+        public string filter { get; set; }
     }
 }

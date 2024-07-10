@@ -3,6 +3,7 @@ using HeyTripCarWeb.Share.Dtos;
 using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using HeyTripCarWeb.Supplier.ABG.Models.RSs;
+using Newtonsoft.Json;
 using Serilog;
 using System.Diagnostics;
 using System.Net;

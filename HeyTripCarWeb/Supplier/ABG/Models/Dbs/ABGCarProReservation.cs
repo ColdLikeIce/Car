@@ -1,11 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
 {
     [Table("ABG_CarProReservation")]
     public class ABGCarProReservation
     {
+        [Key]
         public string OrderNo { get; set; }
+
         public string ReservationId { get; set; }
         public string ReservationType { get; set; }
         public DateTime? PickUpDateTime { get; set; }

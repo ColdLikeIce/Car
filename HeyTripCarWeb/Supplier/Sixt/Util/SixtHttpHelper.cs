@@ -25,6 +25,12 @@ namespace HeyTripCarWeb.Supplier.Sixt.Util
 
         public static async Task<string> GetToken(SixtAppSetting _setting)
         {
+            var nowtime = DateTime.Now;
+            var tokenModel = SixtCacheInstance.Instance.GetToken();
+            if (tokenModel != null && tokenModel.passtime > nowtime.AddMinutes(1))
+            {
+                return tokenModel.token;
+            }
             string accessToken = "";
             // 创建HttpClient实例
             using (HttpClient client = new HttpClient())
@@ -51,6 +57,8 @@ namespace HeyTripCarWeb.Supplier.Sixt.Util
 
                     // 提取访问令牌
                     accessToken = jsonResponse["access_token"].ToString();
+                    //塞进缓存
+                    SixtCacheInstance.Instance.SetToken(new SixtToken { token = accessToken, passtime = nowtime.AddMinutes(15) });
                     Log.Information($"Access Token: {accessToken}");
                 }
                 else

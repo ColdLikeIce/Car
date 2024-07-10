@@ -14,6 +14,19 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
         [XmlElement("VehResRQCore")]
         public VehResRQCore VehResRQCore { get; set; }
     }
+    public class SpecialEquipPrefs
+    {
+        [XmlElement("SpecialEquipPref")]
+        public List<SpecialEquipPref> SpecialEquipPrefList { get; set; }
+    }
+    public class SpecialEquipPref
+    {
+        [XmlAttribute("EquipType")]
+        public string EquipType { get; set; }
+
+        [XmlAttribute("Quantity")]
+        public string Quantity { get; set; }
+    }
 
     public class CreateVehType
     {
@@ -35,11 +48,17 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
         [XmlElement("VendorPref")]
         public VendorPref VendorPref { get; set; }
 
+        [XmlElement("DriverType")]
+        public DriverType DriverType { get; set; }
+
         [XmlElement("VehPref")]
         public CreateVehPref VehPref { get; set; }
 
         [XmlElement("RateQualifier")]
         public RateQualifier RateQualifier { get; set; }
+
+        [XmlElement("SpecialEquipPrefs")]
+        public SpecialEquipPrefs SpecialEquipPrefs { get; set; }
     }
 
     public class CreateVehPref

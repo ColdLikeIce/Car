@@ -52,9 +52,9 @@ namespace HeyTripCarWeb.Share
                 parameters.Add(theadId, item.theadId);
                 parameters.Add(rqtype, item.ApiType.ToString());
                 parameters.Add(level, item.Level);
+                parameters.Add(rqinfo, item.rqInfo);
                 //压缩一下
                 item.rsInfo = GZipHelper.Compress(item.rsInfo);
-                parameters.Add(rqinfo, item.rqInfo);
                 parameters.Add(rsinfo, item.rsInfo);
                 parameters.Add(exception, item.exception);
                 index++;

@@ -4,9 +4,7 @@ using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Share.Dbs;
 using HeyTripCarWeb.Share.Dtos;
-using HeyTripCarWeb.Supplier.ABG.Models.Dbs;
 using HeyTripCarWeb.Supplier.ABG.Models.Dtos;
-using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using HeyTripCarWeb.Supplier.ACE.Util;
 using HeyTripCarWeb.Supplier.BarginCar.Config;
 using HeyTripCarWeb.Supplier.BarginCar.Model.Dbs;
@@ -22,6 +20,7 @@ using Newtonsoft.Json.Linq;
 using Serilog;
 using StackExchange.Redis;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection.Metadata;
@@ -39,10 +38,10 @@ namespace HeyTripCarWeb.Supplier.Sixt
     /// 美元结算(月结)。
     ///
     ///
-    /// 有押金  取消政策：取车前免费取消  noshow 是否扣费
+    /// 有押金  取消政策：取车前免费取消
+    /// 目前第一步只实现到付
+    /// 里程政策
     ///
-    ///
-    /// 9：目前结算
     public class SixtApi : ISixtApi
     {
         private readonly SixtAppSetting _setting;
@@ -71,7 +70,12 @@ namespace HeyTripCarWeb.Supplier.Sixt
 
         public async Task<List<CarLocationSupplier>> GetAllLocation()
         {
-            var spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = 25 });
+            var spLoc = SixtCacheInstance.Instance.GetAllItems();
+            if (spLoc.Count == 0)
+            {
+                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = 25 });
+                SixtCacheInstance.Instance.SetLocation(spLoc);
+            }
             return spLoc;
         }
 
@@ -218,6 +222,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     Log.Error($"country处理失败{ex.Message}");
                 }
             }
+            SixtCacheInstance.Instance.SetLocation(new List<CarLocationSupplier>());
             return true;
         }
 
@@ -251,7 +256,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                 {
                     res.CancelSuc = true;
 
-                    dbOrder.State = model.state;
+                    dbOrder.State = "canceled";
                     dbOrder.Status = model.status;
                     dbOrder.UpdateTime = DateTime.Now;
                     await _orderRepository.UpdateAsync(dbOrder);
@@ -333,26 +338,31 @@ namespace HeyTripCarWeb.Supplier.Sixt
                 {
                     birday = DateTime.Now.AddYears(-createOrderRQ.DriverAge).ToString("yyyy-MM-dd");
                 }
+                var countryCode = createOrderRQ.ContactNumber.Split("_").FirstOrDefault();
+                if (countryCode.Length > 4)
+                {
+                    countryCode = "";
+                }
                 var postdata = new RentalBookingRQ
                 {
                     ConfigurationId = configid,
                     FlightNumber = createOrderRQ.FlightNumber,
-                    
                     Drivers = new List<Driver>
-                  {
-                      new Driver{
-                          GivenName=createOrderRQ.FirstName,
-                          FamilyName = createOrderRQ.LastName,
-                          Birthdate = birday,
-                          Contact = new ContactDetails
-                          {
-                              Email=createOrderRQ.Email,
-                              Telephone= new Telephone{
-                               Number =createOrderRQ.ContactNumber
-                              },
-                          },
-                      }
-                  },
+                    {
+                        new Driver{
+                            GivenName=createOrderRQ.FirstName,
+                            FamilyName = createOrderRQ.LastName,
+                            Birthdate = birday,
+                            Contact = new ContactDetails
+                            {
+                                Email=createOrderRQ.Email,
+                                Telephone= new Telephone{
+                                CountryCode = countryCode,
+                                Number =createOrderRQ.ContactNumber
+                                },
+                            },
+                        }
+                    },
                     BrokerEmail = createOrderRQ.Email,
                     AgencyNumber = _setting.AgencyNumber
                 };
@@ -429,6 +439,10 @@ namespace HeyTripCarWeb.Supplier.Sixt
             {
                 url += $"&driverAge={dto.DriverAge}";
             }
+            if (!string.IsNullOrWhiteSpace(_setting.filter))
+            {
+                url += $"&{_setting.filter}";
+            }
             url += $"&pointOfSale={dto.startLoc.CountryCode}&corporateCustomerNumber={_setting.CorporateCustomerNumber}";
             var header = new Dictionary<string, string>();
             header.Add("Currency", "EUR");
@@ -464,7 +478,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                         DriveType = EnumCarDriveType.Unspecified, //usertodo
                         FuelType = of.VehicleGroupInfo.GroupInfo.IsElectric ? EnumCarFuelType.Electric : EnumCarFuelType.Unspecified,
                         TransmissionType = of.VehicleGroupInfo.GroupInfo.IsAutomatic ? EnumCarTransmissionType.Automatic : EnumCarTransmissionType.Manual,
-                        FuelPolicy = EnumCarFuelPolicy.None, //usertodo
+                        FuelPolicy = EnumCarFuelPolicy.None, //usertodo 燃油政策
                         PassengerQuantity = of.VehicleGroupInfo.GroupInfo.MaxPassengers,
                         BaggageQuantity = of.VehicleGroupInfo.GroupInfo.Baggage.Bags,
                         PictureURL = of.VehicleGroupInfo.GroupInfo.ImageUrl,
@@ -520,6 +534,11 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     {
                         Log.Error($"usertodel存在其他支付类型{of.Payment.SelectedPaymentOption}");
                     }
+                    //取消政策 免费取消
+                    std.CancelPolicy = new StdCancelPolicy
+                    {
+                        CancelType = EnumCarCancelType.FeeCancel
+                    };
                     std.TotalCharge = stdTotal;
                     //押金信息
                     List<StdPricedCoverage> pricedCoverageList = new List<StdPricedCoverage>();
@@ -528,12 +547,17 @@ namespace HeyTripCarWeb.Supplier.Sixt
                         stdTotal.AddOtherAmount(EnumCarCoverageType.Deposit, EnumCarPayWhen.NoNeed, of.DepositCurrency, of.DepositAmount.Value);
                     }
                     var protectList = of.Charges.Where(n => n.Type == "protection").ToList();
+                    List<string> containStatus = new List<string> { "selected", "included", "mandatory" };
                     foreach (var pro in protectList)
                     {
+                        /*if (pro.Status != "available" && pro.Id != "LD" && pro.Id != "BF")
+                        {
+                            Log.Information($"存在保险类型{pro.Status}");
+                        }*/
                         StdPricedCoverage pricedCoverage = new StdPricedCoverage
                         {
-                            Required = pro.Status == "selected" ? true : false,
-                            CoverageType = BuildEnumCarCoverageType(pro.Id), //usertodo
+                            Required = pro.Status == "mandatory" ? true : false,
+                            CoverageType = BuildEnumCarCoverageType(pro.Id),
                             CoverageDescription = pro.Description,
                             CurrencyCode = pro.Price.Currency,
                             Amount = pro.Price.Amount,
@@ -544,7 +568,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                         {
                             Log.Information($"usertodel存在不同的保险类型{JsonConvert.SerializeObject(pro)}");
                         }
-                        if (pro.Status == "selected")
+                        if (containStatus.Contains(pro.Status))
                         {
                             pricedCoverage.IncludedInEstTotalInd = true;
                         }
@@ -555,6 +579,12 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             Quantity = 1
                         };
                         pricedCoverageList.Add(pricedCoverage);
+
+                        var included = containStatus.Contains(pro.Status);//包含到总价
+                        if (included) //包含了才输出
+                        {
+                            std.TotalCharge.AddOtherAmount(pricedCoverage.CoverageType, EnumCarPayWhen.NoNeed, pro.Price.Currency, pro.Price.Amount);
+                        }
                     }
                     std.PricedCoverages = pricedCoverageList;
                     //设备信息
@@ -590,6 +620,10 @@ namespace HeyTripCarWeb.Supplier.Sixt
                         {
                             Log.Information($"usertodel:存在没有处理的other类型【{JsonConvert.SerializeObject(eq)}】");
                         }
+                        if (equipType == EnumCarEquipType.None)
+                        {
+                            continue;
+                        }
                         StdPricedEquip pricedEquip = new StdPricedEquip
                         {
                             EquipType = equipType,
@@ -599,7 +633,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             UnitPrice = eq.Price.Amount,
                             MaxQuantity = eq.MaxQuantity,
                         };
-                        if (eq.Status == "selected")
+                        if (containStatus.Contains(eq.Status))
                         {
                             pricedEquip.IncludedInEstTotalInd = true;
                         }
@@ -863,8 +897,6 @@ namespace HeyTripCarWeb.Supplier.Sixt
                 case "TG":
                     return EnumCarCoverageType.WWI;
 
-                case "BQ":
-                    return EnumCarCoverageType.None;//usertodo
                 case "BC":
                     return EnumCarCoverageType.RSA;
 

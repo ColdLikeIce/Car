@@ -11,6 +11,7 @@ using HeyTripCarWeb.Supplier.ABG.Models.RQs;
 using HeyTripCarWeb.Supplier.ABG.Models.RSs;
 using HeyTripCarWeb.Supplier.ABG.Util;
 using HeyTripCarWeb.Supplier.ACE.Util;
+using HeyTripCarWeb.Supplier.Sixt;
 using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic;
@@ -85,6 +86,32 @@ namespace HeyTripCarWeb.Supplier.ABG
         #region 原始接口
 
         /// <summary>
+        /// 获取所有门店
+        /// </summary>
+        /// <returns></returns>
+        public async Task<List<CarLocationSupplier>> GetAllLocation()
+        {
+            var spLoc = ABGCacheInstance.Instance.GetAllItems();
+            if (spLoc.Count == 0)
+            {
+                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.ABG });
+                ABGCacheInstance.Instance.SetLocation(spLoc);
+            }
+            return spLoc;
+        }
+
+        public async Task<List<AbgYoungDriver>> GetAllYoungDriverAsync()
+        {
+            var spLoc = ABGCacheInstance.Instance.GetAllAbgYoungDriver();
+            if (spLoc.Count == 0)
+            {
+                spLoc = await _yourDriverRepository.GetAllAsync();
+                ABGCacheInstance.Instance.SetYoungDriver(spLoc);
+            }
+            return spLoc;
+        }
+
+        /// <summary>
         /// 查询车辆集合。
         /// 支持：IATA/AirportID/CityID/Geo
         /// </summary>
@@ -95,7 +122,6 @@ namespace HeyTripCarWeb.Supplier.ABG
         {
             var supplierInfo = dto.SupplierInfo;
 
-            var locList = dto.LocList;
             var driverList = dto.youngDriverList;
             List<StdVehicleExtend> result = new List<StdVehicleExtend>();
             var res = BuildEnvelope(new CommonRequest { OTA_VehAvailRateRQ = availRateRQ, Type = ApiEnum.List });
@@ -407,14 +433,46 @@ namespace HeyTripCarWeb.Supplier.ABG
                             RentalAmount = totalCharge.RateTotalAmount,
                             OtherAmounts = stdAmount
                         };
-                        var startLoc = locList.FirstOrDefault(n => n.LocationCode == loc.FirstOrDefault().Code);
-                        var endloc = locList.FirstOrDefault(n => n.LocationCode == loc.LastOrDefault().Code);
-
-                        //取车地点
-                        std.Location = new StdLocation
+                        var pickUp = dto.startLoc;
+                        var endLoc = dto.endLoc;
+                        std.Location = new StdLocation()
                         {
-                            DropOff = BuildLocationDetail(loc.LastOrDefault(), startLoc),
-                            PickUp = BuildLocationDetail(loc.FirstOrDefault(), endloc),
+                            PickUp = new StdLocationInfo()
+                            {
+                                SuppLocId = pickUp.SuppLocId,
+                                VendorLocId = pickUp.VendorLocId,
+                                LocationName = pickUp.LocationName,
+                                Latitude = pickUp.Latitude,
+                                Longitude = pickUp.Longitude,
+                                LocationId = pickUp.LocationId,
+                                CityId = pickUp.CityId,
+                                PostalCode = pickUp.PostalCode,
+                                StateCode = pickUp.StateCode,
+                                CityName = pickUp.CityName,
+                                CountryCode = pickUp.CountryCode,
+                                CloseTime = pickUp.CloseTime,
+                                OpenTime = pickUp.OpenTime,
+                                CountryName = pickUp.CountryName,
+                                OperationTimes = JsonConvert.DeserializeObject<List<StdOperationTime>>(pickUp.OperationTime)
+                            },
+                            DropOff = new StdLocationInfo()
+                            {
+                                SuppLocId = endLoc.SuppLocId,
+                                VendorLocId = endLoc.VendorLocId,
+                                LocationName = endLoc.LocationName,
+                                Latitude = endLoc.Latitude,
+                                Longitude = endLoc.Longitude,
+                                LocationId = endLoc.LocationId,
+                                CityId = endLoc.CityId,
+                                PostalCode = endLoc.PostalCode,
+                                StateCode = endLoc.StateCode,
+                                CityName = endLoc.CityName,
+                                CountryCode = endLoc.CountryCode,
+                                CloseTime = endLoc.CloseTime,
+                                OpenTime = endLoc.OpenTime,
+                                CountryName = endLoc.CountryName,
+                                OperationTimes = JsonConvert.DeserializeObject<List<StdOperationTime>>(endLoc.OperationTime)
+                            }
                         };
 
                         var driverInfo = driverList.FirstOrDefault(n => n.Code == loc.FirstOrDefault()?.Code && n.CarGroup == std.VehicleCode[0].ToString());
@@ -517,8 +575,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                     foreach (var eq in equips)
                     {
                         StdPricedEquip stdPricedEquip = new StdPricedEquip();
-                        stdPricedEquip.EquipType = BuildPricedEquip(Convert.ToInt32(eq.Equipment.EquipType));
-
+                        stdPricedEquip.EquipType = BuildPricedEquip(eq.Equipment.EquipType);
+                        if (stdPricedEquip.EquipType == EnumCarEquipType.None)
+                        {
+                            Log.Error($"存在没有处理的设备{JsonConvert.SerializeObject(eq)}");
+                            continue;
+                        }
+                        if (stdPricedEquip.EquipType == EnumCarEquipType.AdditionalDriver)
+                        {
+                            Log.Information($"存在超龄驾驶员");
+                        }
                         stdPricedEquip.EquipDescription = "";
                         stdPricedEquip.Unit = BuildEquipUnitType(eq.Charge.Calculation.UnitName);
                         stdPricedEquip.Currency = eq.Charge.CurrencyCode;
@@ -711,6 +777,23 @@ namespace HeyTripCarWeb.Supplier.ABG
         }
 
         /// <summary>
+        /// 构建供应商那边设备枚举
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public string GetSupplierEquipType(EnumCarEquipType type)
+        {
+            foreach (var pair in dict)
+            {
+                if (EqualityComparer<EnumCarEquipType>.Default.Equals(pair.Value, type))
+                {
+                    return pair.Key;
+                }
+            }
+            return "";
+        }
+
+        /// <summary>
         /// 构建设备单位枚举
         /// </summary>
         /// <param name="unitName"></param>
@@ -732,12 +815,42 @@ namespace HeyTripCarWeb.Supplier.ABG
             return EnumCarPeriodUnitName.RentalPeriod;
         }
 
+        private Dictionary<string, EnumCarEquipType> dict = new Dictionary<string, EnumCarEquipType>()
+        {
+              {"119",EnumCarEquipType.AdditionalDriver },
+              {"9",EnumCarEquipType.CBS },
+              {"7",EnumCarEquipType.InfantSeat },
+              {"8",EnumCarEquipType.CST },
+              {"13",EnumCarEquipType.GPS },
+              {"10",EnumCarEquipType.SnowChains },
+              {"14",EnumCarEquipType.SnowTires },
+              {"226",EnumCarEquipType.CBF },
+              {"59",EnumCarEquipType.CO2 },
+              {"132",EnumCarEquipType.CSI },
+              {"2",EnumCarEquipType.BYC },
+              {"4",EnumCarEquipType.SKR },
+              {"3",EnumCarEquipType.LUG },
+              {"55",EnumCarEquipType.WIFI },
+              {"131",EnumCarEquipType.BlueTooth },
+              {"146",EnumCarEquipType.Mobile_Phone_Charger },
+              {"47",EnumCarEquipType.Snow_Board_Rack },
+              {"171",EnumCarEquipType.Baby_Stroller },
+        };
+
         /// <summary>
         /// 构建设备类型
         /// </summary>
-        public EnumCarEquipType BuildPricedEquip(int? type)
+        public EnumCarEquipType BuildPricedEquip(string? type)
         {
-            switch (type)
+            if (dict.TryGetValue(type, out EnumCarEquipType value))
+            {
+                return value;
+            }
+            else
+            {
+                return EnumCarEquipType.None; //跨国*/
+            }
+            /*switch (type)
             {
                 case 119:
                     return EnumCarEquipType.AdditionalDriver;
@@ -801,7 +914,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                     return EnumCarEquipType.Baby_Stroller;
             }
             Log.Information($"usertodel:出现没有匹配到的设备类型[{type}]");
-            return EnumCarEquipType.None;
+            return EnumCarEquipType.None;*/
         }
 
         /// <summary>
@@ -1236,70 +1349,22 @@ namespace HeyTripCarWeb.Supplier.ABG
                     }
                 }
                 List<StdVehicleExtend> firstList = new List<StdVehicleExtend>();
-                var locList = await _locRepository.GetAllAsync();
-                List<ABGLocation> startLocList = new List<ABGLocation>();
-                List<ABGLocation> endLocList = new List<ABGLocation>();
-                if (vehicleRQ.PickUpLocationType == EnumCarLocationType.Airport
-                     && vehicleRQ.ReturnLocationType == EnumCarLocationType.Airport)
+                var locList = await GetAllLocation();
+                var (startLocList, endLocList) = await CommonLocationHelper.GetLocaiton(vehicleRQ, locList);
+                if (startLocList.Count == 0)
                 {
-                    startLocList = locList.Where(n => n.APOCode == vehicleRQ.PickUpLocationCode).ToList();
-                    endLocList = locList.Where(n => n.APOCode == vehicleRQ.ReturnLocationCode).ToList();
+                    return res;
                 }
-                else if (vehicleRQ.PickUpLocationType == EnumCarLocationType.City
-                    && vehicleRQ.ReturnLocationType == EnumCarLocationType.City)
-                {
-                    var lat = Convert.ToDouble(vehicleRQ.PickUpLocationCode.Split("_")[1]);
-                    var lon = Convert.ToDouble(vehicleRQ.PickUpLocationCode.Split("_")[2]);
-                    foreach (var loc in locList)
-                    {
-                        try
-                        {
-                            //有一些不合法转不了数字
-                            if (GeoHelper.IsWithinRange(lat, lon, Convert.ToDouble(loc.Latitude), Convert.ToDouble(loc.Longitude), 20))
-                            {
-                                startLocList.Add(loc);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                        }
-                    }
-                    if (vehicleRQ.PickUpLocationCode != vehicleRQ.ReturnLocationCode)
-                    {
-                        lat = Convert.ToDouble(vehicleRQ.ReturnLocationCode.Split("_")[1]);
-                        lat = Convert.ToDouble(vehicleRQ.ReturnLocationCode.Split("_")[2]);
-                        foreach (var loc in locList)
-                        {
-                            try
-                            {
-                                //有一些不合法转不了数字
-                                if (GeoHelper.IsWithinRange(lat, lon, Convert.ToDouble(loc.Latitude), Convert.ToDouble(loc.Longitude), 20))
-                                {
-                                    endLocList.Add(loc);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                            }
-                        }
-                    }
-                    //城市的todo
-                }
-                else
-                {
-                    return res;//暂不支持
-                }
-
-                var youngDriverList = await _yourDriverRepository.GetAllAsync();
+                var youngDriverList = await GetAllYoungDriverAsync();
                 //usertodo 需要改成并发
                 var iataList = _setting.SupplierInfos;
                 int batchSize = 20; // 限制 10个任务跑
                 List<Task> runTasks = new List<Task>();
                 foreach (var iata in iataList)
                 {
-                    var supplierSloc = startLocList.Where(n => n.VendorName == iata.Vendor).ToList();
+                    var supplierSloc = startLocList.Where(n => n.Vendor == (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(iata.Vendor)).ToList();
 
-                    var supplierRLoc = endLocList.Where(n => n.VendorName == iata.Vendor).ToList();
+                    var supplierRLoc = endLocList.Where(n => n.Vendor == (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(iata.Vendor)).ToList();
                     foreach (var start in supplierSloc)
                     {
                         if (vehicleRQ.PickUpLocationCode == vehicleRQ.ReturnLocationCode)
@@ -1309,11 +1374,12 @@ namespace HeyTripCarWeb.Supplier.ABG
                                 SupplierInfo = iata,
                                 PickUpDateTime = vehicleRQ.PickUpDateTime,
                                 ReturnDateTime = vehicleRQ.ReturnDateTime,
-                                PickUpLocationCode = start.LocationCode,
-                                ReturnLocationCode = start.LocationCode,
+                                PickUpLocationCode = start.VendorLocId,
+                                ReturnLocationCode = start.VendorLocId,
                                 DriverAge = vehicleRQ.DriverAge,
                                 CitizenCountryCode = vehicleRQ.CitizenCountryCode,
-                                LocList = locList,
+                                startLoc = start,
+                                endLoc = start,
                                 youngDriverList = youngDriverList
                             };
                             var task = Task.Run(async () =>
@@ -1322,7 +1388,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                                 firstList.AddRange(rq);
                             });
                             runTasks.Add(task);
-                            if (runTasks.Count > batchSize)
+                            if (runTasks.Count >= batchSize)
                             {
                                 await Task.WhenAll(runTasks);
                                 runTasks = new List<Task>();
@@ -1337,11 +1403,12 @@ namespace HeyTripCarWeb.Supplier.ABG
                                     SupplierInfo = iata,
                                     PickUpDateTime = vehicleRQ.PickUpDateTime,
                                     ReturnDateTime = vehicleRQ.ReturnDateTime,
-                                    PickUpLocationCode = start.LocationCode,
-                                    ReturnLocationCode = end.LocationCode,
+                                    PickUpLocationCode = start.VendorLocId,
+                                    ReturnLocationCode = end.VendorLocId,
                                     DriverAge = vehicleRQ.DriverAge,
                                     CitizenCountryCode = vehicleRQ.CitizenCountryCode,
-                                    LocList = locList,
+                                    startLoc = start,
+                                    endLoc = end,
                                     youngDriverList = youngDriverList
                                 };
                                 var task = Task.Run(async () =>
@@ -1563,7 +1630,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                 {
                     throw new Exception("供应商解析不正确");
                 }
-                var dbOrder = await _proOrdRepository.GetByIdAsync("select * from ABG_CarProReservation where orderno = @orderid", new { orderid = createOrderRQ.OrderNo });
+                var dbOrder = await _proOrdRepository.GetByIdAsync(createOrderRQ.OrderNo);
                 if (dbOrder != null)
                 {
                     return new StdCreateOrderRS()
@@ -1621,6 +1688,24 @@ namespace HeyTripCarWeb.Supplier.ABG
                         RateQualifier = new RateQualifier { RateQualifierValue = ratecodeList.LastOrDefault() }
                     }
                 };
+                if (createOrderRQ.Extras != null && createOrderRQ.Extras.Count > 0)
+                {
+                    List<SpecialEquipPref> equips = new List<SpecialEquipPref>();
+                    foreach (var item in createOrderRQ.Extras)
+                    {
+                        SpecialEquipPref eq = new SpecialEquipPref
+                        {
+                            EquipType = GetSupplierEquipType(item.EquipType),
+                            Quantity = item.Quantity.ToString()
+                        };
+                        equips.Add(eq);
+                    }
+                    postModel.VehResRQCore.SpecialEquipPrefs = new SpecialEquipPrefs {SpecialEquipPrefList = equips };
+                }
+                if (createOrderRQ.DriverAge > 0)
+                {
+                    postModel.VehResRQCore.DriverType = new DriverType { Age = createOrderRQ.DriverAge };
+                }
                 return await CreateOrderAsync(createOrderRQ, secSupplier, postModel);
             }
             catch (Exception ex)
@@ -1636,11 +1721,6 @@ namespace HeyTripCarWeb.Supplier.ABG
                     await InsertApiLog();
                 });
             }
-        }
-
-        public async Task<bool> BuildAllLocation()
-        {
-            return true;
         }
 
         public async Task InsertApiLog()
@@ -2018,7 +2098,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         {
             //FTPDownLoad();
             //找出所有的db
-            var dbList = await _yourDriverRepository.GetAllAsync();
+            var dbList = await GetAllYoungDriverAsync();
             foreach (var item in _setting.SupplierInfos)
             {
                 var filename = "YoungDriver.dat";
@@ -2165,6 +2245,8 @@ namespace HeyTripCarWeb.Supplier.ABG
             await InitSupplierLocaiton();
             await InitCreditCardPolicy();
             await InitYoungDriver();
+            ABGCacheInstance.Instance.SetYoungDriver(new List<AbgYoungDriver>());
+            ABGCacheInstance.Instance.SetLocation(new List<CarLocationSupplier>());
         }
 
         #endregion FTP落地数据 location, Location Opening Times
@@ -2173,7 +2255,7 @@ namespace HeyTripCarWeb.Supplier.ABG
 
         public async Task RunLoation()
         {
-            var location = await _locRepository.GetAllAsync();
+            var location = await GetAllLocation();
             var iataList = _setting.SupplierInfos;
             List<StdVehicle> res = new List<StdVehicle>();
             int batchSize = 10; // 限制 10个任务跑
@@ -2188,11 +2270,12 @@ namespace HeyTripCarWeb.Supplier.ABG
                         SupplierInfo = iata,
                         PickUpDateTime = DateTime.Now.AddDays(60),
                         ReturnDateTime = DateTime.Now.AddDays(61),
-                        PickUpLocationCode = loc.LocationCode,
-                        ReturnLocationCode = loc.LocationCode,
+                        PickUpLocationCode = loc.VendorLocId,
+                        ReturnLocationCode = loc.VendorLocId,
                         // DriverAge = vehicleRQ.DriverAge,
                         CitizenCountryCode = "US",
-                        LocList = location,
+                        startLoc = loc,
+                        endLoc = loc,
                         youngDriverList = youngDriverList
                     };
                     var task = Task.Run(async () =>

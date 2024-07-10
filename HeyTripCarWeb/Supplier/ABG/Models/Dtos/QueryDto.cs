@@ -36,7 +36,6 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dtos
         /// </summary>
         public string CitizenCountryCode { get; set; }
 
-        public List<ABGLocation> LocList { get; set; }
         public List<AbgYoungDriver> youngDriverList { get; set; }
         public CarLocationSupplier startLoc { get; set; }
         public CarLocationSupplier endLoc { get; set; }
