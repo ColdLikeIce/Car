@@ -89,8 +89,8 @@ namespace HeyTripCarWeb.Supplier.ACE.Util
             {
                 LogInfo loginfo = new LogInfo
                 {
-                    tableName = "Abg_SupplierRqLogInfo",
-                    logType = LogEnum.ABG,
+                    tableName = "Ace_RqLogInfo",
+                    logType = LogEnum.ACE,
                     rqInfo = requestXml,
                     rsInfo = responseText,
                     Level = level,

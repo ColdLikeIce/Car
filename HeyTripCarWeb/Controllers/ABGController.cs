@@ -10,15 +10,15 @@ using XiWan.Car.BusinessShared.Stds;
 namespace HeyTripCarWeb.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
-    public class ABGCarController : ControllerBase
+    [Route("/api/[controller]")]
+    public class ABGController : ControllerBase
     {
         private readonly IABGApi _carSupplierApi;
 
         private readonly JwtHelper _jwtHelper;
         private readonly JwtConfig _config;
 
-        public ABGCarController(IABGApi carSupplierApi, IOptions<JwtConfig> options, JwtHelper jwtHelper)
+        public ABGController(IABGApi carSupplierApi, IOptions<JwtConfig> options, JwtHelper jwtHelper)
         {
             _carSupplierApi = carSupplierApi;
             _jwtHelper = jwtHelper;
@@ -32,7 +32,11 @@ namespace HeyTripCarWeb.Controllers
             string token = _jwtHelper.CreateToken(timeout, vehicleRQ.Account, vehicleRQ.Password, _config);
             return new TokenModelRes { ExpireTime = DateTime.Now.AddSeconds(timeout), Token = token };
         }
-
+        [HttpPost("DecompressString")]
+        public ActionResult<string> DecompressString(string body, int timeout = 15000)
+        {
+            return GZipHelper.DecompressString(body);
+        }
         [HttpPost("GetVehicles")]
         public async Task<List<StdVehicle>> GetVehiclesAsync([FromBody] StdGetVehiclesRQ dto)
         {

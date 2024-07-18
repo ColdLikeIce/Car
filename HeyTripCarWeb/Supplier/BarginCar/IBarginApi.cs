@@ -14,5 +14,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar
         Task<StdQueryOrderRS> QueryOrderAsync(StdQueryOrderRQ queryOrderRQ, int timeout = 15000);
 
         Task<bool> BuildAllLocation();
+
+        Task test();
     }
 }

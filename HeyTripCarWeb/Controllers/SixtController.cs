@@ -1,19 +1,31 @@
 using HeyTripCarWeb.Share;
-using HeyTripCarWeb.Supplier.ACE;
+using HeyTripCarWeb.Share.Dtos;
+using HeyTripCarWeb.Supplier.ABG;
+using HeyTripCarWeb.Supplier.ABG.Config;
+using HeyTripCarWeb.Supplier.BarginCar;
+using HeyTripCarWeb.Supplier.Sixt;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using XiWan.Car.BusinessShared.Stds;
 
 namespace HeyTripCarWeb.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
-    public class ACECarController : ControllerBase
+    [Route("/api/Sixt")]
+    public class SixtController : ControllerBase
     {
-        private readonly IACEApi _carSupplierApi;
+        private readonly ISixtApi _carSupplierApi;
 
-        public ACECarController(IACEApi carSupplierApi)
+        private readonly JwtHelper _jwtHelper;
+        private readonly JwtConfig _config;
+
+        public SixtController(ISixtApi carSupplierApi, IOptions<JwtConfig> options, JwtHelper jwtHelper)
         {
             _carSupplierApi = carSupplierApi;
+            _jwtHelper = jwtHelper;
+            _config = options.Value;
+            _jwtHelper = jwtHelper;
         }
 
         [HttpPost("GetVehicles")]
@@ -23,6 +35,7 @@ namespace HeyTripCarWeb.Controllers
         }
 
         [HttpPost("CreateOrder")]
+        [Authorize]
         public async Task<StdCreateOrderRS> CreateOrderAsync([FromBody] StdCreateOrderRQ dto)
         {
             return await _carSupplierApi.CreateOrderAsync(dto);
@@ -35,15 +48,22 @@ namespace HeyTripCarWeb.Controllers
         }
 
         [HttpPost("QueryOrder")]
+        [Authorize]
         public async Task<StdQueryOrderRS> QueryOrderAsync([FromBody] StdQueryOrderRQ dto)
         {
             return await _carSupplierApi.QueryOrderAsync(dto);
         }
 
-        [HttpGet("BuildLocation")]
-        public async Task BuildLocation()
+        [HttpGet("Init")]
+        public async Task InitLocation()
         {
             await _carSupplierApi.BuildAllLocation();
+        }
+
+        [HttpGet("test")]
+        public async Task test()
+        {
+            await _carSupplierApi.test();
         }
     }
 }

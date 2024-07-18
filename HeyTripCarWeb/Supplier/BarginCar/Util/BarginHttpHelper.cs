@@ -1,4 +1,5 @@
 ﻿using HeyTripCarWeb.Share;
+using HeyTripCarWeb.Share.Dtos;
 using HeyTripCarWeb.Supplier.BarginCar.Config;
 using HeyTripCarWeb.Supplier.BarginCar.Model.RSs;
 using Microsoft.VisualBasic;
@@ -36,8 +37,12 @@ namespace HeyTripCarWeb.Supplier.BarginCar.Util
             return hash;
         }
 
-        public static async Task<T> BasePostRequest<T>(string request, BarginCarAppSetting setting)
+        public static async Task<(T, string)> BasePostRequest<T>(string request, BarginCarAppSetting setting, ApiEnum type)
         {
+            var responseText = "";
+            var exception = "";
+            var level = "info";
+            var theadId = Thread.CurrentThread.ManagedThreadId;
             try
             {
                 var url = setting.url + setting.apiKey;
@@ -46,23 +51,34 @@ namespace HeyTripCarWeb.Supplier.BarginCar.Util
                 Dictionary<string, string> dicList = new Dictionary<string, string>();
                 dicList.Add("signature", signature);
 
-                var resStr = HttpHelper.HttpPost(url, request, "application/json", headers: dicList);
-
+                var resStr = await HttpHelper.HttpPostByHeaders(url, request, dicList: dicList);
+                responseText = resStr;
+                resStr = resStr.Replace("\"results\":[]", "\"results\":{}");
                 var result = JsonConvert.DeserializeObject<T>(resStr);
-                /*      if (result.status == "OK")
-                      {
-                          return result.result;
-                      }
-                      else
-                      {
-                          Log.Error($"接口请求失败{resStr}");
-                      }*/
 
-                return result;
+                return (result, resStr);
             }
             catch (Exception ex)
             {
+                Log.Error($"调用接口异常{ex.Message}");
+                exception = ex.Message;
+
                 throw ex;
+            }
+            finally
+            {
+                LogInfo loginfo = new LogInfo
+                {
+                    logType = LogEnum.Sixt,
+                    rqInfo = $"{request}",
+                    rsInfo = responseText,
+                    Level = level,
+                    exception = exception,
+                    Date = DateTime.Now,
+                    ApiType = type,
+                    theadId = theadId
+                };
+                SupplierLogInstance.Instance.Enqueue(loginfo);
             }
         }
     }

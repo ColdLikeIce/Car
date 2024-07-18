@@ -73,7 +73,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
             var spLoc = SixtCacheInstance.Instance.GetAllItems();
             if (spLoc.Count == 0)
             {
-                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = 25 });
+                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.Sixt });
                 SixtCacheInstance.Instance.SetLocation(spLoc);
             }
             return spLoc;
@@ -137,7 +137,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             location.PostalCode = loc.Address?.Postcode;
                             location.Telephone = loc.StationInformation.Contact?.Telephone;
                             location.Email = loc.StationInformation.Contact?.Email;
-                            location.Supplier = 25;
+                            location.Supplier = (int)EnumCarSupplier.Sixt;
                             location.SuppLocId = loc.Id;
                             location.Vendor = (int)EnumCarVendor.Sixt;
                             location.VendorLocId = loc.Id;
@@ -270,13 +270,6 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     CancelSuc = false,
                     Message = ex.Message,
                 };
-            }
-            finally
-            {
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
             }
         }
 
@@ -421,13 +414,6 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     Message = ex.Message,
                 };
             }
-            finally
-            {
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
-            }
         }
 
         public async Task<List<StdVehicle>> GetVehiclesByloc(QueryDto dto)
@@ -465,11 +451,11 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     var sipp = of.VehicleGroupInfo?.GroupInfo?.VehicleGroup;
                     StdVehicle std = new StdVehicle
                     {
-                        Supplier = EnumCarSupplier.None, //usertodo
+                        Supplier = EnumCarSupplier.Sixt,
                         Vendor = EnumCarVendor.Sixt,
                         VehicleName = of.Title,
                         VehicleGroup = (EnumCarVehicleGroup)SIPPHelper.SIPPCodeAnalysis(sipp, 3),
-                        ProductCode = $"{EnumCarSupplier.None}_{dto.startLoc.VendorLocId}_{sipp}",
+                        ProductCode = $"{EnumCarSupplier.Sixt}_{dto.startLoc.VendorLocId}_{sipp}",
                         VehicleCode = sipp,
                         DoorCount = (EnumCarDoorCount)of.VehicleGroupInfo?.GroupInfo?.Doors,
                         VehicleCategory = EnumHelper.GetEnumTypeByStr<EnumCarVehicleCategory>(of.VehicleGroupInfo?.Type),
@@ -488,7 +474,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             YoungDriverMinAge = of.VehicleGroupInfo.GroupInfo.DriverRequirements.MinAge,
                             MinDrivingExperience = of.VehicleGroupInfo.GroupInfo.DriverRequirements.LicenseMinYears
                         },
-                        TermsAndConditionsRef = termsAndConditionsRef
+                        //TermsAndConditionsRef = termsAndConditionsRef
                     };
 
                     //里程限制
@@ -537,7 +523,18 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     //取消政策 免费取消
                     std.CancelPolicy = new StdCancelPolicy
                     {
-                        CancelType = EnumCarCancelType.FeeCancel
+                        CancelType = EnumCarCancelType.FeeCancel,
+                        Rules = new List<StdCancelRule>
+                        {
+                            new StdCancelRule
+                            {
+                                DeductType = EnumCarDeductType.Free,
+                                Currency =  stdTotal.Currency,
+                                StartTime = DateTime.Now,
+                                EndTime = dto.PickUpDateTime,
+                                DeductValue = 0,
+                            }
+                        }
                     };
                     std.TotalCharge = stdTotal;
                     //押金信息
@@ -592,29 +589,6 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     List<StdPricedEquip> equips = new List<StdPricedEquip>();
                     foreach (var eq in othereq)
                     {
-                        /* if (eq.Id == "4W")
-                         {
-                             //出现驱动信息
-                             Log.Information($"todel出现驱动信息{eq.Id}");
-                             //std.DriveType = EnumCarDriveType.WD4;
-                             continue;
-                         }
-                         if (eq.Id == "AW")
-                         {
-                             Log.Information($"todel出现驱动信息{eq.Id}");
-                             std.DriveType = EnumCarDriveType.AWD;
-                             continue;
-                         }
-                         if (eq.Id == "FF")
-                         {
-                             Log.Information($"todel出现燃油信息{eq.Id}");
-                             std.DriveType = EnumCarDriveType.AWD;
-                             continue;
-                         }
-                         if (eq.Id == "DI")
-                         {
-                             std.FuelType = EnumCarFuelType.Diesel;
-                         }*/
                         var equipType = BuildEnumCarEquipType(eq);
                         if (equipType == EnumCarEquipType.None && !ExceptCode.Contains(eq.Id))
                         {
@@ -931,36 +905,15 @@ namespace HeyTripCarWeb.Supplier.Sixt
             return EnumCarCoverageType.None;
         }
 
-        /// <summary>
-        /// 插入APi日志
-        /// </summary>
-        /// <returns></returns>
-        public async Task InsertApiLog()
-        {
-            try
-            {
-                using var scope = _serviceProvider.CreateAsyncScope();
-                var _domain = scope.ServiceProvider.GetRequiredService<IRepository<SixtCarProReservation>>();
-                var (sql, para) = await ApiLogHelper.GetApiLogSql(Share.Dtos.LogEnum.Sixt);
-                if (sql != null)
-                {
-                    await _domain.ExecuteSql(sql, para);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"插入日志失败{ex.Message}");
-            }
-        }
-
         public async Task<List<StdVehicle>> GetVehiclesAsync(StdGetVehiclesRQ vehicleRQ, int timeout = 45000)
         {
+            Log.Information($"接收到参数{JsonConvert.SerializeObject(vehicleRQ)}");
             List<StdVehicle> firstList = new List<StdVehicle>();
             try
             {
                 var locList = await GetAllLocation();
                 var (startLocList, endLocList) = await CommonLocationHelper.GetLocaiton(vehicleRQ, locList);
-                int batchSize = 10; // 限制 10个任务跑
+                int batchSize = 4; // 限制 10个任务跑
                 List<Task> runTasks = new List<Task>();
                 var token = await SixtHttpHelper.GetToken(_setting);
                 //43686
@@ -1023,20 +976,14 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     }
                 }
                 await Task.WhenAll(runTasks);
+                var ss = JsonConvert.SerializeObject(firstList);
+                Log.Information($"return:【{firstList.Count}】");
                 return firstList;
             }
             catch (Exception ex)
             {
                 Log.Error($"查询出现异常{ex.Message}");
                 return firstList;
-            }
-            finally
-            {
-                //插入日志
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
             }
         }
 
@@ -1090,14 +1037,6 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     ErrorMessage = ex.Message,
                     IsSuccess = false
                 };
-            }
-            finally
-            {
-                //插入日志
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
             }
         }
 

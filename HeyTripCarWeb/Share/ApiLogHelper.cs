@@ -1,5 +1,7 @@
 ﻿using Dapper;
 using HeyTripCarWeb.Share.Dtos;
+using HeyTripCarWeb.Supplier;
+using Newtonsoft.Json;
 
 namespace HeyTripCarWeb.Share
 {
@@ -9,28 +11,14 @@ namespace HeyTripCarWeb.Share
         /// 插入接口日志 要求异步
         /// </summary>
         /// <returns></returns>
-        public static async Task<(string, DynamicParameters)> GetApiLogSql(LogEnum type)
+        public static async Task<(string, DynamicParameters, string)> GetApiLogSql(LogEnum type)
         {
             var logList = SupplierLogInstance.GetLogInfoItem(type);
             if (logList.Count == 0)
             {
-                return (null, null);
+                return (null, null, null);
             }
-            var tableName = "";
-            switch (type)
-            {
-                case LogEnum.ABG:
-                    tableName = "Abg_RqLogInfo";
-                    break;
-
-                case LogEnum.ACE:
-                    tableName = "Ace_RqLogInfo";
-                    break;
-
-                case LogEnum.Sixt:
-                    tableName = "Sixt_RqLogInfo";
-                    break;
-            }
+            var tableName = $"{type.ToString()}_RqLogInfo";
             var sql = $"INSERT INTO {tableName} (date,theadId,reqType, level, rqinfo,rsinfo,exception) VALUES ";
             var parameters = new DynamicParameters();
 
@@ -54,7 +42,8 @@ namespace HeyTripCarWeb.Share
                 parameters.Add(level, item.Level);
                 parameters.Add(rqinfo, item.rqInfo);
                 //压缩一下
-                item.rsInfo = GZipHelper.Compress(item.rsInfo);
+                var rsInfo = item.rsInfo;
+                item.rsInfo = GZipHelper.Compress(rsInfo);
                 parameters.Add(rsinfo, item.rsInfo);
                 parameters.Add(exception, item.exception);
                 index++;
@@ -62,7 +51,7 @@ namespace HeyTripCarWeb.Share
 
             sql += string.Join(", ", values);
 
-            return (sql, parameters);
+            return (sql, parameters, JsonConvert.SerializeObject(logList));
         }
     }
 }

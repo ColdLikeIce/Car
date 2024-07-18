@@ -30,6 +30,7 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using Twilio.Rest.Trunking.V1;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Stds;
@@ -94,7 +95,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             var spLoc = ABGCacheInstance.Instance.GetAllItems();
             if (spLoc.Count == 0)
             {
-                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.ABG });
+                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier and status = 1", new { supplier = (int)EnumCarSupplier.ABG });
                 ABGCacheInstance.Instance.SetLocation(spLoc);
             }
             return spLoc;
@@ -210,7 +211,6 @@ namespace HeyTripCarWeb.Supplier.ABG
                             var charges = rentalRate.VehicleCharges.VehicleCharge.Where(n => n.Purpose == "8").ToList();
                             if (charges.Count > 0)
                             {
-                                Log.Information($"charges数量为{charges}");
                                 rateinfo.Currency = charges.FirstOrDefault().CurrencyCode;
                                 rateinfo.Amount = charges.FirstOrDefault().Amount;
                                 rateinfo.Description = charges.FirstOrDefault().Description;
@@ -453,7 +453,6 @@ namespace HeyTripCarWeb.Supplier.ABG
                                 CloseTime = pickUp.CloseTime,
                                 OpenTime = pickUp.OpenTime,
                                 CountryName = pickUp.CountryName,
-                                OperationTimes = JsonConvert.DeserializeObject<List<StdOperationTime>>(pickUp.OperationTime)
                             },
                             DropOff = new StdLocationInfo()
                             {
@@ -471,32 +470,18 @@ namespace HeyTripCarWeb.Supplier.ABG
                                 CloseTime = endLoc.CloseTime,
                                 OpenTime = endLoc.OpenTime,
                                 CountryName = endLoc.CountryName,
-                                OperationTimes = JsonConvert.DeserializeObject<List<StdOperationTime>>(endLoc.OperationTime)
                             }
                         };
-
+                        if (pickUp.OperationTime != null)
+                        {
+                            std.Location.PickUp.OperationTimes = JsonConvert.DeserializeObject<List<StdOperationTime>>(pickUp.OperationTime);
+                        }
+                        if (endLoc.OperationTime != null)
+                        {
+                            std.Location.DropOff.OperationTimes = JsonConvert.DeserializeObject<List<StdOperationTime>>(endLoc.OperationTime);
+                        }
                         var driverInfo = driverList.FirstOrDefault(n => n.Code == loc.FirstOrDefault()?.Code && n.CarGroup == std.VehicleCode[0].ToString());
-                        /*                        if (termsAndConditions.SelectMany(n => n.Sections).Select(s => s.Title).Contains("Age Requirements"))
-                                                {
-                                                    Log.Information($"原文已经存在驾照年龄要求");
-                                                }
-                                                else
-                                                {
-                                                    if (driverInfo != null)
-                                                    {
-                                                        StdTermAndCondition cardConfition = new StdTermAndCondition
-                                                        {
-                                                            Titel = "Age Requirements",
-                                                            Sections = new List<StdSection>
-                                                        {
-                                                            new StdSection{Text=$"The minimum age to drive a vehicle with Avis is {driverInfo?.MinimumAge} years of age. All drivers must hold a current, full and valid drivers licence, that has been valid for a minimum of 12 consecutive months. A young driver surcharge may apply."}
-                                                        }
-                                                        };
-                                                        termsAndConditions.Add(cardConfition);
-                                                    }
 
-                                                    Log.Error("driveAgetodo");
-                                                }*/
                         if (driverInfo != null)
                         {
                             std.MinDriverAge = driverInfo.MinimumAge.HasValue ? driverInfo.MinimumAge.Value : 0;
@@ -505,22 +490,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                         //取车前免费取消  noshow 取 60 EUR
                         std.CancelPolicy = new StdCancelPolicy
                         {
-                            CancelType = EnumCarCancelType.NonCancel,
+                            CancelType = EnumCarCancelType.FeeCancel,
                             Rules = new List<StdCancelRule>
                             {
                                 new StdCancelRule
                                 {
+                                    DeductType = EnumCarDeductType.Free,
                                     Currency =  totalCharge.CurrencyCode,
                                     StartTime = DateTime.Now,
                                     EndTime = availRateRQ.VehAvailRQCore.VehRentalCore.PickUpDateTime,
                                     DeductValue=0,
-                                },
-                                new StdCancelRule
-                                {
-                                    Currency = "EUR",
-                                    StartTime = availRateRQ.VehAvailRQCore.VehRentalCore.PickUpDateTime,
-                                    EndTime =DateTime.MaxValue,
-                                    DeductValue = 60,
                                 }
                             }
                         };
@@ -537,7 +516,17 @@ namespace HeyTripCarWeb.Supplier.ABG
                         foreach (var supplier in supplierInfo.secSuppliers)
                         {
                             var newItem = _mapper.Map<StdVehicleExtend, StdVehicleExtend>(std);
-                            newItem.TotalCharge.PayType = supplier.PayType;
+                            newItem.TotalCharge = new StdTotalCharge
+                            {
+                                //支付模式根据供应商的来
+                                //PayType = supplierInfo.PayType, //先不赋值 交给后面多种支付方式赋值
+                                PriceType = std.TotalCharge.PriceType, //底价模式
+                                Currency = std.TotalCharge.Currency,
+                                TotalAmount = std.TotalCharge.TotalAmount,
+                                RentalAmount = std.TotalCharge.RentalAmount,
+                                OtherAmounts = std.TotalCharge.OtherAmounts,
+                                PayType = supplier.PayType
+                            };
                             newItem.RateCode = newItem.RateCode.Replace("UserVerdorType", supplier.VerdorType.ToString());
                             result.Add(newItem);
                         }
@@ -578,12 +567,12 @@ namespace HeyTripCarWeb.Supplier.ABG
                         stdPricedEquip.EquipType = BuildPricedEquip(eq.Equipment.EquipType);
                         if (stdPricedEquip.EquipType == EnumCarEquipType.None)
                         {
-                            Log.Error($"存在没有处理的设备{JsonConvert.SerializeObject(eq)}");
+                            //Log.Error($"存在没有处理的设备{JsonConvert.SerializeObject(eq)}");
                             continue;
                         }
                         if (stdPricedEquip.EquipType == EnumCarEquipType.AdditionalDriver)
                         {
-                            Log.Information($"存在超龄驾驶员");
+                            //Log.Information($"存在超龄驾驶员");
                         }
                         stdPricedEquip.EquipDescription = "";
                         stdPricedEquip.Unit = BuildEquipUnitType(eq.Charge.Calculation.UnitName);
@@ -591,6 +580,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         stdPricedEquip.UnitPrice = eq.Charge.Calculation.UnitCharge;
                         stdPricedEquip.TaxInclusive = eq.Charge.TaxInclusive;
                         stdPricedEquip.IncludedInEstTotalInd = eq.Charge.IncludedInEstTotalInd;
+                        stdPricedEquip.MaxQuantity = 1;
                         eqList.Add(stdPricedEquip);
                     }
                     std.PricedEquips = eqList;
@@ -629,7 +619,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                         StdTermAndCondition newitem = new StdTermAndCondition
                         {
                             Code = msg.Title,
-                            Sections = stdSections
+                            Sections = stdSections,
+                            Titel = msg.Title
                         };
                         termsAndConditions.Add(newitem);
                     }
@@ -1061,28 +1052,15 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <returns></returns>
         public EnumCarVehicleCategory BuildCarType(string category)
         {
-            switch (category)
+            try
             {
-                case "1":
-                    return EnumCarVehicleCategory.Car;
-
-                case "2":
-                    return EnumCarVehicleCategory.Van;
-
-                case "3":
-                    return EnumCarVehicleCategory.SUV;
-
-                case "4":
-                    return EnumCarVehicleCategory.Convertible;
-
-                case "8":
-                    return EnumCarVehicleCategory.StationWagon;
-
-                case "9":
-                    return EnumCarVehicleCategory.Pickup;
+                return (EnumCarVehicleCategory)Convert.ToInt32(category);
             }
-            Log.Error($"遇到其他车型{category}");
-            return EnumCarVehicleCategory.None;
+            catch (Exception ex)
+            {
+                Log.Error($"遇到其他车型{category}");
+                return EnumCarVehicleCategory.None;
+            }
         }
 
         public async Task<StdCreateOrderRS> CreateOrderAsync(StdCreateOrderRQ originModel, SecSupplier supplier, ABG_OTA_VehResRQ createOrderRQ, int timeout = 15000)
@@ -1326,6 +1304,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <returns></returns>
         public async Task<List<StdVehicle>> GetVehiclesAsync(StdGetVehiclesRQ vehicleRQ, int timeout = 45000)
         {
+            Log.Information($"接收到参数{JsonConvert.SerializeObject(vehicleRQ)}");
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             List<StdVehicle> res = new List<StdVehicle>();
@@ -1355,10 +1334,15 @@ namespace HeyTripCarWeb.Supplier.ABG
                 {
                     return res;
                 }
-                var youngDriverList = await GetAllYoungDriverAsync();
+                var codeList = startLocList.Select(n => $"'{n.SuppLocId}'").ToList();
+                codeList.AddRange(endLocList.Select(n => $"'{n.SuppLocId}'").ToList());
+
+                var youngDriverList = await _yourDriverRepository.GetListBySqlAsync($"select * from Abg_YoungDriver where code in ({string.Join(",", codeList.Distinct().ToList())})", null);
+
+                //var youngDriverList = await GetAllYoungDriverAsync();
                 //usertodo 需要改成并发
                 var iataList = _setting.SupplierInfos;
-                int batchSize = 20; // 限制 10个任务跑
+                int batchSize = 10; // 限制 10个任务跑
                 List<Task> runTasks = new List<Task>();
                 foreach (var iata in iataList)
                 {
@@ -1427,8 +1411,10 @@ namespace HeyTripCarWeb.Supplier.ABG
                     }
                 }
                 await Task.WhenAll(runTasks);
+                ParallelOptions options = new ParallelOptions();
+                options.MaxDegreeOfParallelism = 10; // 设置最大线程数为 4
                 //并发请求raterule规则构建实体
-                Parallel.ForEach(firstList, async item =>
+                Parallel.ForEach(firstList, options, async item =>
                 {
                     await BuildTermsAndConditions(item);
                     // 在这里执行一些操作
@@ -1460,6 +1446,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                     }
                 }
                 res = _mapper.Map<StdVehicleExtend, StdVehicle>(firstList);
+
                 return res;
             }
             catch (Exception ex)
@@ -1470,12 +1457,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             finally
             {
                 stopwatch.Stop();
-                Log.Information($"sum{stopwatch.ElapsedMilliseconds}");
-                //插入日志
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
+                Log.Information($"耗时{stopwatch.ElapsedMilliseconds}ms");
             }
         }
 
@@ -1533,14 +1515,6 @@ namespace HeyTripCarWeb.Supplier.ABG
                 Log.Error($"APIERR:{ex.Message}");
                 return new StdQueryOrderRS();
             }
-            finally
-            {
-                //插入日志
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
-            }
         }
 
         public async Task<StdCancelOrderRS> CancelOrderAsync(StdCancelOrderRQ cancelOrderRQ, int timeout = 15000)
@@ -1590,14 +1564,6 @@ namespace HeyTripCarWeb.Supplier.ABG
             {
                 Log.Error($"APIERR:{ex.Message}");
                 return new StdCancelOrderRS();
-            }
-            finally
-            {
-                //插入日志
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
             }
         }
 
@@ -1698,9 +1664,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                             EquipType = GetSupplierEquipType(item.EquipType),
                             Quantity = item.Quantity.ToString()
                         };
+                        if (eq.EquipType == "")
+                        {
+                            continue;
+                        }
                         equips.Add(eq);
                     }
-                    postModel.VehResRQCore.SpecialEquipPrefs = new SpecialEquipPrefs {SpecialEquipPrefList = equips };
+                    if (equips.Count > 0)
+                    {
+                        postModel.VehResRQCore.SpecialEquipPrefs = new SpecialEquipPrefs { SpecialEquipPrefList = equips };
+                    }
                 }
                 if (createOrderRQ.DriverAge > 0)
                 {
@@ -1712,32 +1685,6 @@ namespace HeyTripCarWeb.Supplier.ABG
             {
                 Log.Error($"APIERR:{ex.Message}");
                 return new StdCreateOrderRS();
-            }
-            finally
-            {
-                //插入日志
-                Task.Run(async () =>
-                {
-                    await InsertApiLog();
-                });
-            }
-        }
-
-        public async Task InsertApiLog()
-        {
-            try
-            {
-                using var scope = _serviceProvider.CreateAsyncScope();
-                var _domain = scope.ServiceProvider.GetRequiredService<IRepository<ABGRateCache>>();
-                var (sql, para) = await ApiLogHelper.GetApiLogSql(Share.Dtos.LogEnum.ABG);
-                if (sql != null)
-                {
-                    await _domain.ExecuteSql(sql, para);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"插入日志失败{ex.Message}");
             }
         }
 
@@ -1839,9 +1786,9 @@ namespace HeyTripCarWeb.Supplier.ABG
                     spModel.SuppLocId = item.LocationCode;
                     spModel.Vendor = (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(item.VendorName);
                     spModel.VendorLocId = item.LocationCode;
-                    spModel.CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    //spModel.CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     spModel.UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    await _supplierCatRe.UpdateAsync(spModel);
+                    await _supplierCatRe.UpdateAsync(spModel, "status");
                 }
             }
         }
@@ -2258,7 +2205,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             var location = await GetAllLocation();
             var iataList = _setting.SupplierInfos;
             List<StdVehicle> res = new List<StdVehicle>();
-            int batchSize = 10; // 限制 10个任务跑
+            int batchSize = 4; // 限制 10个任务跑
             List<Task> runTasks = new List<Task>();
             var youngDriverList = await _yourDriverRepository.GetAllAsync();
             foreach (var loc in location)

@@ -52,7 +52,17 @@ namespace HeyTripCarWeb.Share
             return _dataQueue.ToList();
         }
 
-        public static List<LogInfo> GetLogInfoItem(LogEnum type)
+        public static List<LogInfo> GetAllLogInfoItem()
+        {
+            List<LogInfo> res = new List<LogInfo>();
+            while (_dataQueue.TryDequeue(out var item))
+            {
+                res.Add(item);
+            }
+            return res;
+        }
+
+        public static List<LogInfo> GetLogInfoItem(LogEnum type, int batchSize = 10)
         {
             var tempQueue = new ConcurrentQueue<LogInfo>();
             List<LogInfo> res = new List<LogInfo>();
@@ -62,8 +72,13 @@ namespace HeyTripCarWeb.Share
                 if (item.logType != type)
                 {
                     tempQueue.Enqueue(item);
+                    continue;
                 }
                 res.Add(item);
+                if (res.Count >= batchSize)
+                {
+                    break;
+                }
             }
 
             // 将临时队列中的元素重新添加回原队列

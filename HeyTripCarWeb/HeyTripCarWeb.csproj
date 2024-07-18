@@ -99,7 +99,6 @@
     <Folder Include="logs\" />
     <Folder Include="Supplier\ABG\Sql\" />
     <Folder Include="Supplier\BarginCar\Doc\" />
-    <Folder Include="Supplier\BarginCar\Model\RQs\" />
     <Folder Include="Supplier\Sixt\Doc\" />
   </ItemGroup>
 

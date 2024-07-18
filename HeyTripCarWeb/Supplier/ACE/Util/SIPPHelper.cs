@@ -85,6 +85,7 @@ namespace HeyTripCarWeb.Supplier.ACE.Util
                             break;
                     }
                     break;
+
                 case 2:
                     switch (sippCode[1])
                     {
@@ -94,6 +95,10 @@ namespace HeyTripCarWeb.Supplier.ACE.Util
 
                         case 'D':
                             returnRes = (int)EnumCarDoorCount.Door4;
+                            break;
+
+                        case 'C':
+                            returnRes = (int)EnumCarDoorCount.Door2_4;
                             break;
                     }
                     break;
@@ -135,62 +140,190 @@ namespace HeyTripCarWeb.Supplier.ACE.Util
                             break;
                     }
                     break;
+
                 case 4:
                     switch (sippCode[0])
                     {
                         case 'C':
                             returnRes = (int)EnumCarVehicleClass.Compact;
                             break;
+
                         case 'D':
                             returnRes = (int)EnumCarVehicleClass.CompactElite;
                             break;
+
                         case 'E':
                             returnRes = (int)EnumCarVehicleClass.Economy;
                             break;
+
                         case 'F':
                             returnRes = (int)EnumCarVehicleClass.Fullsize;
                             break;
+
                         case 'G':
                             returnRes = (int)EnumCarVehicleClass.FullsizeElite;
                             break;
+
                         case 'H':
                             returnRes = (int)EnumCarVehicleClass.EconomyElite;
                             break;
+
                         case 'I':
                             returnRes = (int)EnumCarVehicleClass.Intermediate;
                             break;
+
                         case 'J':
                             returnRes = (int)EnumCarVehicleClass.IntermediateElite;
                             break;
+
                         case 'L':
                             returnRes = (int)EnumCarVehicleClass.Luxury;
                             break;
+
                         case 'M':
                             returnRes = (int)EnumCarVehicleClass.Mini;
                             break;
+
                         case 'N':
                             returnRes = (int)EnumCarVehicleClass.MiniElite;
                             break;
+
                         case 'O':
                             returnRes = (int)EnumCarVehicleClass.Oversize;
                             break;
+
                         case 'P':
                             returnRes = (int)EnumCarVehicleClass.Premium;
                             break;
+
                         case 'R':
                             returnRes = (int)EnumCarVehicleClass.StandardElite;
                             break;
+
                         case 'S':
                             returnRes = (int)EnumCarVehicleClass.Standard;
                             break;
+
                         case 'U':
                             returnRes = (int)EnumCarVehicleClass.PremiumElite;
                             break;
+
                         case 'W':
                             returnRes = (int)EnumCarVehicleClass.LuxuryElite;
                             break;
+
                         case 'X':
                             returnRes = (int)EnumCarVehicleClass.Special;
+                            break;
+                    }
+                    break;
+
+                case 5:
+                    switch (sippCode[2])
+                    {
+                        case 'A':
+                        case 'B':
+                        case 'D':
+                            returnRes = (int)EnumCarTransmissionType.Automatic;
+                            break;
+
+                        case 'C':
+                        case 'M':
+                        case 'N':
+                            returnRes = (int)EnumCarTransmissionType.Manual;
+                            break;
+                    }
+                    break;
+
+                case 6:
+                    switch (sippCode[1])
+                    {
+                        case 'B':
+                            returnRes = (int)EnumCarVehicleCategory.DoorCar2_3;
+                            break;
+
+                        case 'C':
+                            returnRes = (int)EnumCarVehicleCategory.DoorCar2Or4;
+                            break;
+
+                        case 'D':
+                            returnRes = (int)EnumCarVehicleCategory.DoorCar4_5;
+                            break;
+
+                        case 'E':
+                            returnRes = (int)EnumCarVehicleCategory.Coupe;
+                            break;
+
+                        case 'F':
+                            returnRes = (int)EnumCarVehicleCategory.SUV;
+                            break;
+
+                        case 'G':
+                            returnRes = (int)EnumCarVehicleCategory.Crossover;
+                            break;
+
+                        case 'H':
+                            returnRes = (int)EnumCarVehicleCategory.Motorhome;
+                            break;
+
+                        case 'J':
+                            returnRes = (int)EnumCarVehicleCategory.AllTerrain;
+                            break;
+
+                        case 'K':
+                            returnRes = (int)EnumCarVehicleCategory.CommercialVanOrTruck;
+                            break;
+
+                        case 'L':
+                            returnRes = (int)EnumCarVehicleCategory.Limo;
+                            break;
+
+                        case 'M':
+                            returnRes = (int)EnumCarVehicleCategory.Monospace;
+                            break;
+
+                        case 'N':
+                            returnRes = (int)EnumCarVehicleCategory.Roadster;
+                            break;
+
+                        case 'P':
+                            returnRes = (int)EnumCarVehicleCategory.Pickup;
+                            break;
+
+                        case 'Q':
+                            returnRes = (int)EnumCarVehicleCategory.Pickup;
+                            break;
+
+                        case 'R':
+                            returnRes = (int)EnumCarVehicleCategory.Recreational;
+                            break;
+
+                        case 'S':
+                            returnRes = (int)EnumCarVehicleCategory.Sport;
+                            break;
+
+                        case 'T':
+                            returnRes = (int)EnumCarVehicleCategory.Convertible;
+                            break;
+
+                        case 'V':
+                            returnRes = (int)EnumCarVehicleCategory.Van;
+                            break;
+
+                        case 'W':
+
+                            break;
+
+                        case 'X':
+                            returnRes = (int)EnumCarVehicleCategory.Special;
+                            break;
+
+                        case 'Y':
+                            returnRes = (int)EnumCarVehicleCategory.ToWheelVehicle;
+                            break;
+
+                        case 'Z':
+                            returnRes = (int)EnumCarVehicleCategory.SpecialOffer;
                             break;
                     }
                     break;

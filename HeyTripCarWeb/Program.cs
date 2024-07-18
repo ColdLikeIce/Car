@@ -67,6 +67,8 @@ builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("Jwt"));
 builder.Logging.AddConsole();
 
 builder.Services.AddHostedService<SFTPToDbWorker>();
+builder.Services.AddHostedService<LogToDbWorker>();
+
 // 添加Swagger生成器和UI
 builder.Services.Configure<ApiBehaviorOptions>(options => options.SuppressModelStateInvalidFilter = true);
 // 添加 Swagger 配置

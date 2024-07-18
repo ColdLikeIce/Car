@@ -11,7 +11,7 @@ using XiWan.Car.BusinessShared.Stds;
 namespace HeyTripCarWeb.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("/api/[controller]")]
     public class BarginCarController : ControllerBase
     {
         private readonly IBarginApi _carSupplierApi;
@@ -27,41 +27,45 @@ namespace HeyTripCarWeb.Controllers
             _jwtHelper = jwtHelper;
         }
 
-        [HttpPost("GetToken")]
-        public ActionResult<TokenModelRes> GetTokenAsync(TokenModelQue vehicleRQ, int timeout = 15000)
-        {
-            string token = _jwtHelper.CreateToken(timeout, vehicleRQ.Account, vehicleRQ.Password, _config);
-            return new TokenModelRes { ExpireTime = DateTime.Now.AddSeconds(timeout), Token = token };
-        }
-
         [HttpPost("GetVehicles")]
+        [Authorize]
         public async Task<List<StdVehicle>> GetVehiclesAsync([FromBody] StdGetVehiclesRQ dto)
         {
             return await _carSupplierApi.GetVehiclesAsync(dto);
         }
 
         [HttpPost("CreateOrder")]
+        [Authorize]
         public async Task<StdCreateOrderRS> CreateOrderAsync([FromBody] StdCreateOrderRQ dto)
         {
             return await _carSupplierApi.CreateOrderAsync(dto);
         }
 
         [HttpPost("CancelOrder")]
+        [Authorize]
         public async Task<StdCancelOrderRS> CancelOrderAsync([FromBody] StdCancelOrderRQ dto)
         {
             return await _carSupplierApi.CancelOrderAsync(dto);
         }
 
         [HttpPost("QueryOrder")]
+        [Authorize]
         public async Task<StdQueryOrderRS> QueryOrderAsync([FromBody] StdQueryOrderRQ dto)
         {
             return await _carSupplierApi.QueryOrderAsync(dto);
         }
 
         [HttpGet("InitLocation")]
+        [Authorize]
         public async Task InitLocation()
         {
             await _carSupplierApi.BuildAllLocation();
+        }
+
+        [HttpGet("test")]
+        public async Task test()
+        {
+            await _carSupplierApi.test();
         }
     }
 }

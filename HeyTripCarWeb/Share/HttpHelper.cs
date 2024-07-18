@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Text;
 
 namespace HeyTripCarWeb.Share
 {
@@ -9,6 +10,52 @@ namespace HeyTripCarWeb.Share
         static HttpHelper()
         {
             HttpClient = new HttpClient();
+        }
+
+        public static async Task<string> HttpPostByHeaders(string Url, string postDataStr, Dictionary<string, string> dicList, string contentType = "application/json")
+        {
+            //接口返回报文
+            string result = string.Empty;
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(Url);
+                request.Method = "POST";
+                request.Timeout = 5000;
+                if (contentType == null)
+                {
+                    request.ContentType = "application/x-www-form-urlencoded";
+                }
+                else
+                {
+                    request.ContentType = contentType;
+                }
+                foreach (var dic in dicList)
+                {
+                    request.Headers.Add(dic.Key, dic.Value);
+                }
+
+                byte[] data = Encoding.GetEncoding("utf-8").GetBytes(postDataStr);
+
+                request.ContentLength = data.Length;
+
+                Stream myRequestStream = request.GetRequestStream();
+
+                myRequestStream.Write(data, 0, data.Length);
+                myRequestStream.Close();
+
+                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+
+                Stream myResponseStream = response.GetResponseStream();
+                StreamReader myStreamReader = new StreamReader(myResponseStream, Encoding.GetEncoding("utf-8"));
+                result = await myStreamReader.ReadToEndAsync();
+                myStreamReader.Close();
+                myResponseStream.Close();
+            }
+            catch (WebException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+            return result;
         }
 
         /// <summary>

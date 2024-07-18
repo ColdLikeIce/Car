@@ -505,8 +505,8 @@ RuleType=""3"" />
                         if (veCore.Status == "Available")
                         {
                             StdVehicle std = new StdVehicle();
-                            std.Supplier = EnumCarSupplier.None;
-                            std.Vendor = EnumCarVendor.ACE_Rent_A_Car;
+                            std.Supplier = EnumCarSupplier.None; //usertodo
+                            std.Vendor = EnumCarVendor.Ace;
                             std.VehicleCode = veCore.Vehicle?.Code;
 
                             std.VehicleName = veCore.Vehicle?.VehMakeModel?.Name;
@@ -590,7 +590,7 @@ RuleType=""3"" />
                             }
                             std.PricedEquips = stdeq;
                             //ratecode
-                            std.RateCode = $"{EnumCarVendor.ACE_Rent_A_Car}_{veCore.Reference.Type}_{veCore.Reference.ID}";
+                            std.RateCode = $"{EnumCarVendor.Ace}_{veCore.Reference.Type}_{veCore.Reference.ID}";
                             //保险
                             List<StdPricedCoverage> stdPricedCoverages = new List<StdPricedCoverage>();
                             foreach (var pricedCoverage in veCore.PricedCoverages)
