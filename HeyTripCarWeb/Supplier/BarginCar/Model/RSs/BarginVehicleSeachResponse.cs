@@ -51,7 +51,7 @@
         /// <summary>
         ///
         /// </summary>
-        public List<string> holidays { get; set; }
+        public List<object> holidays { get; set; }
 
         /// <summary>
         ///
@@ -821,12 +821,12 @@
         /// <summary>
         ///
         /// </summary>
-        public int fees { get; set; }
+        public decimal? fees { get; set; }
 
         /// <summary>
         ///
         /// </summary>
-        public int totalfeeamount { get; set; }
+        public decimal? totalfeeamount { get; set; }
 
         /// <summary>
         ///
@@ -846,7 +846,7 @@
         /// <summary>
         ///
         /// </summary>
-        public int maximumprice { get; set; }
+        public decimal? maximumprice { get; set; }
 
         /// <summary>
         ///

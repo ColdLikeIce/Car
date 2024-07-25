@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HeyTripCarWeb.Supplier.ACE.Models.Dbs
 {
@@ -6,6 +7,7 @@ namespace HeyTripCarWeb.Supplier.ACE.Models.Dbs
     public class ACERateCache
     {
         // Properties matching the table columns
+        [Key]
         public string SearchMD5 { get; set; } // Matches
 
         public string SearchKey { get; set; } // Matches

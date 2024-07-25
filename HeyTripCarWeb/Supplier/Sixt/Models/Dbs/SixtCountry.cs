@@ -10,7 +10,7 @@ namespace HeyTripCarWeb.Supplier.Sixt.Models.Dbs
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
-        public string CountryName { get; set; }
-        public string CountryCode { get; set; }
+        public string? CountryName { get; set; }
+        public string? CountryCode { get; set; }
     }
 }

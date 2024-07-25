@@ -56,7 +56,6 @@ namespace HeyTripCarWeb.Controllers
         }
 
         [HttpGet("InitLocation")]
-        [Authorize]
         public async Task InitLocation()
         {
             await _carSupplierApi.BuildAllLocation();

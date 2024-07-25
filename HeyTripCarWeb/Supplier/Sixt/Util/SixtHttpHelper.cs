@@ -7,7 +7,6 @@ using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Net.Http.Headers;
-using static Dapper.SqlMapper;
 using System.Security.Authentication;
 using System.Text;
 using Microsoft.AspNetCore.SignalR;

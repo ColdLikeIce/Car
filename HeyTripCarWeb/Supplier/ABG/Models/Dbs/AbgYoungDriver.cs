@@ -8,12 +8,12 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int ID { get; set; }
 
-        public string Code { get; set; }
-        public string Country { get; set; }
-        public string Region { get; set; }
-        public string Station { get; set; }
-        public string LocationName { get; set; }
-        public string CarGroup { get; set; }
+        public string? Code { get; set; }
+        public string? Country { get; set; }
+        public string? Region { get; set; }
+        public string? Station { get; set; }
+        public string? LocationName { get; set; }
+        public string? CarGroup { get; set; }
         public int? MinimumAge { get; set; }
         public int? MaximumAge { get; set; }
         public int? YoungAge { get; set; }
@@ -43,6 +43,6 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.Dbs
         public string? SlovakMaximumAgeSurcharge { get; set; }
         public DateTime? CreateTime { get; set; }
         public DateTime? UpdateTime { get; set; }
-        public string HashKey { get; set; } // 存文本的哈希值 有变化再做更新
+        public string? HashKey { get; set; } // 存文本的哈希值 有变化再做更新
     }
 }

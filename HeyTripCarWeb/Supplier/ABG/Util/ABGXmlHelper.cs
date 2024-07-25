@@ -11,8 +11,6 @@ using System.Text;
 using System.Threading;
 using System.Xml;
 using System.Xml.Serialization;
-using Twilio.TwiML;
-using static Dapper.SqlMapper;
 
 namespace HeyTripCarWeb.Supplier.ABG.Util
 {

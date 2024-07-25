@@ -1,4 +1,5 @@
-﻿using System.Xml.Serialization;
+﻿using HeyTripCarWeb.Supplier.Sixt.Models.RSs;
+using System.Xml.Serialization;
 
 namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
 {
@@ -13,12 +14,17 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
 
         [XmlElement("VehResRQCore")]
         public VehResRQCore VehResRQCore { get; set; }
+
+        [XmlElement(ElementName = "VehResRQInfo")]
+        public VehResRQInfo VehResRQInfo { get; set; }
     }
+
     public class SpecialEquipPrefs
     {
         [XmlElement("SpecialEquipPref")]
         public List<SpecialEquipPref> SpecialEquipPrefList { get; set; }
     }
+
     public class SpecialEquipPref
     {
         [XmlAttribute("EquipType")]
@@ -32,6 +38,42 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
     {
         [XmlAttribute("VehicleCategory")]
         public int VehicleCategory { get; set; }
+    }
+
+    public class VehResRQInfo
+    {
+        [XmlElement(ElementName = "RentalPaymentPref")]
+        public RentalPaymentPref RentalPaymentPref { get; set; }
+    }
+
+    public class RentalPaymentPref
+    {
+        [XmlElement(ElementName = "Voucher")]
+        public CreateVoucher Voucher { get; set; }
+
+        [XmlElement(ElementName = "PaymentAmount")]
+        public PaymentAmount PaymentAmount { get; set; }
+    }
+
+    public class CreateVoucher
+    {
+        [XmlAttribute(AttributeName = "Identifier")]
+        public string Identifier { get; set; }
+
+        [XmlAttribute(AttributeName = "ValueType")]
+        public string ValueType { get; set; }
+
+        [XmlAttribute(AttributeName = "ElectronicIndicator")]
+        public bool ElectronicIndicator { get; set; }
+    }
+
+    public class PaymentAmount
+    {
+        [XmlAttribute(AttributeName = "Amount")]
+        public decimal Amount { get; set; }
+
+        [XmlAttribute(AttributeName = "CurrencyCode")]
+        public string CurrencyCode { get; set; }
     }
 
     public class VehResRQCore

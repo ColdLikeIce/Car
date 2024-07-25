@@ -1,4 +1,5 @@
 ﻿using Azure.Core;
+using CommonCore.EntityFramework.Common;
 using CommonCore.Mapper;
 using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
@@ -13,18 +14,17 @@ using HeyTripCarWeb.Supplier.Sixt.Models.Dbs;
 using HeyTripCarWeb.Supplier.Sixt.Models.RQs;
 using HeyTripCarWeb.Supplier.Sixt.Models.RSs;
 using HeyTripCarWeb.Supplier.Sixt.Util;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic.FileIO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Serilog;
-using StackExchange.Redis;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection.Metadata;
-using Twilio.Jwt.AccessToken;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Public;
@@ -46,36 +46,31 @@ namespace HeyTripCarWeb.Supplier.Sixt
     {
         private readonly SixtAppSetting _setting;
         private readonly IMapper _mapper;
-        private readonly IRepository<CarLocationSupplier> _supplierCatRe;
-        private readonly IRepository<CarCity> _CatCityRe;
-        private readonly IRepository<SixtCountry> _countryRe;
+        private readonly IBaseRepository<CarRentalDbContext> cr_repository;
+        private readonly IBaseRepository<CarSupplierDbContext> _repository;
 
-        private readonly IRepository<SixtLocation> _locRepository;
-        private readonly IRepository<SixtCarProReservation> _orderRepository;
         private readonly IServiceProvider _serviceProvider;
 
-        public SixtApi(IOptions<SixtAppSetting> options, IMapper mapper, IRepository<CarLocationSupplier> supplierCatRe,
-           IRepository<CarCity> catCityRe, IRepository<SixtLocation> locRepository,
-           IRepository<SixtCarProReservation> orderRepository, IRepository<SixtCountry> countryRe, IServiceProvider serviceProvider)
+        public SixtApi(IOptions<SixtAppSetting> options, IMapper mapper, IServiceProvider serviceProvider, IBaseRepository<CarRentalDbContext> _cr_repository,
+            IBaseRepository<CarSupplierDbContext> repository)
         {
             _setting = options.Value;
             _mapper = mapper;
-            _supplierCatRe = supplierCatRe;
-            _CatCityRe = catCityRe;
-            _countryRe = countryRe;
-            _locRepository = locRepository;
-            _orderRepository = orderRepository;
             _serviceProvider = serviceProvider;
+            cr_repository = _cr_repository;
+            _repository = repository;
         }
 
         public async Task<List<CarLocationSupplier>> GetAllLocation()
         {
-            var spLoc = SixtCacheInstance.Instance.GetAllItems();
-            if (spLoc.Count == 0)
-            {
-                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.Sixt });
-                SixtCacheInstance.Instance.SetLocation(spLoc);
-            }
+            /*            var spLoc = SixtCacheInstance.Instance.GetAllItems();
+                        if (spLoc.Count == 0)
+                        {
+                            spLoc = await cr_repository.GetRepository<CarLocationSupplier>().Query().Where(n => n.Supplier == (int)EnumCarSupplier.Sixt && n.Status == 1).ToListAsync();
+                            SixtCacheInstance.Instance.SetLocation(spLoc);
+                        }*/
+            var spLoc = await cr_repository.GetRepository<CarLocationSupplier>().Query().Where(n => n.Supplier == (int)EnumCarSupplier.Sixt && n.Status == 1).ToListAsync();
+
             return spLoc;
         }
 
@@ -85,12 +80,19 @@ namespace HeyTripCarWeb.Supplier.Sixt
         /// <returns></returns>
         public async Task<bool> BuildAllLocation()
         {
+            var country_Re = _repository.GetRepository<SixtCountry>();
+            var loc_Re = _repository.GetRepository<SixtLocation>();
+            var carLoc_Re = cr_repository.GetRepository<CarLocationSupplier>();
+
             var token = await SixtHttpHelper.GetToken(_setting);
             var (countryList, response) = await SixtHttpHelper.GetData<List<CountryRs>>($"{_setting.Url}/stations/countries", token, type: ApiEnum.SixtCountry);
-            var existCountry = await _countryRe.GetAllAsync();
-            var dbLoc = await _locRepository.GetAllAsync();
-            var spLoc = await GetAllLocation();
-            var allCity = await _CatCityRe.GetAllAsync();
+            var existCountry = await _repository.GetRepository<SixtCountry>().Query().ToListAsync();
+            var dbLoc = await _repository.GetRepository<SixtLocation>().Query().ToListAsync();
+            var spLoc = await carLoc_Re.Query().Where(n => n.Supplier == (int)EnumCarSupplier.Sixt).ToListAsync();
+            var allCity = await cr_repository.GetRepository<CarCity>().Query().ToListAsync();
+            List<SixtCountry> countList = new List<SixtCountry>();
+            List<SixtLocation> updateLocList = new List<SixtLocation>();
+            List<CarLocationSupplier> locCarList = new List<CarLocationSupplier>();
             foreach (var country in countryList)
             {
                 try
@@ -102,8 +104,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     }
                     dbmodel.CountryName = country.name;
                     dbmodel.CountryCode = country.iso2code;
-                    await _countryRe.InsertOrUpdate(dbmodel);
-
+                    countList.Add(dbmodel);
                     var (locList, response2) = await SixtHttpHelper.GetData<List<LocationRs>>($"{_setting.Url}/stations/country/{country.iso2code}?corporateCustomerNumber={_setting.CorporateCustomerNumber}", token, type: ApiEnum.Location);
                     if (locList == null)
                     {
@@ -118,6 +119,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             if (exist != null)
                             {
                                 location = exist;
+                                location.Status = 0;
                             }
                             location.LocationName = loc.Title;
                             location.VendorLocId = loc.Id;
@@ -174,15 +176,14 @@ namespace HeyTripCarWeb.Supplier.Sixt
                                 }
                                 location.OperationTime = JsonConvert.SerializeObject(all);
                             }
-
-                            await _locRepository.InsertOrUpdate(location);
-
+                            updateLocList.Add(location);
                             //供应商标准表
-                            var spModel = spLoc.FirstOrDefault(n => n.Supplier == location.Supplier.ToString() && n.VendorLocId == location.VendorLocId.ToString());
+                            var spModel = spLoc.FirstOrDefault(n => n.Supplier == location.Supplier && n.VendorLocId == location.VendorLocId.ToString());
                             var isadd = false;
                             if (spModel == null)
                             {
                                 spModel = new CarLocationSupplier();
+                                spModel.Status = 0;
                                 isadd = true;
                             }
                             spModel.LocationName = location.LocationName;
@@ -199,17 +200,16 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             spModel.Telephone = location.Telephone;
                             spModel.CityId = city == null ? 0 : city.CityId;
                             spModel.OperationTime = location.OperationTime;
-                            spModel.Supplier = ((int)EnumCarSupplier.Jucy).ToString();
+                            spModel.Supplier = (int)EnumCarSupplier.Sixt;
                             spModel.VendorLocId = location.VendorLocId.ToString();
                             spModel.SuppLocId = location.SuppLocId;
-                            spModel.Supplier = location.Supplier.ToString();
-                            spModel.UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                            spModel.UpdateTime = DateTime.Now;
 
                             if (isadd)
                             {
-                                spModel.CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                                spModel.CreateTime = DateTime.Now;
                             }
-                            await _supplierCatRe.InsertOrUpdate(spModel);
+                            locCarList.Add(spModel);
                         }
                         catch (Exception ex)
                         {
@@ -222,6 +222,17 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     Log.Error($"country处理失败{ex.Message}");
                 }
             }
+            //插入城市
+            var insertCountry = countList.Where(n => n.Id == 0 || n.Id == null).ToList();
+            await country_Re.BatchInsertAsync(insertCountry);
+            var updateCountry = countList.Where(n => n.Id > 0).ToList();
+            await country_Re.BatchUpdateAsync(updateCountry);
+            //插入门店
+            await loc_Re.BatchUpdateAsync(updateLocList.Where(n => n.LocationId > 0).ToList());
+            await loc_Re.BatchInsertAsync(updateLocList.Where(n => n.LocationId == 0 || n.LocationId == null).ToList());
+            //插入标准门店
+            await carLoc_Re.BatchUpdateAsync(locCarList.Where(n => n.LocationId > 0).ToList());
+            await carLoc_Re.BatchInsertAsync(locCarList.Where(n => n.LocationId == 0 || n.LocationId == null).ToList());
             SixtCacheInstance.Instance.SetLocation(new List<CarLocationSupplier>());
             return true;
         }
@@ -230,7 +241,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
         {
             try
             {
-                var dbOrder = await _orderRepository.GetByIdAsync(cancelOrderRQ.OrderNo);
+                var dbOrder = _repository.GetRepository<SixtCarProReservation>().Query().FirstOrDefault(n => n.OrderNo == cancelOrderRQ.OrderNo);
                 if (dbOrder == null)
                 {
                     return new StdCancelOrderRS()
@@ -259,7 +270,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                     dbOrder.State = "canceled";
                     dbOrder.Status = model.status;
                     dbOrder.UpdateTime = DateTime.Now;
-                    await _orderRepository.UpdateAsync(dbOrder);
+                    await _repository.GetRepository<SixtCarProReservation>().UpdateAsync(dbOrder);
                 }
                 return res;
             }
@@ -308,7 +319,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
         {
             try
             {
-                var dbOrder = await _orderRepository.GetByIdAsync(createOrderRQ.OrderNo);
+                var dbOrder = _repository.GetRepository<SixtCarProReservation>().Query().FirstOrDefault(n => n.OrderNo == createOrderRQ.OrderNo);
                 if (dbOrder != null)
                 {
                     return new StdCreateOrderRS()
@@ -395,7 +406,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
                         RateCode = createOrderRQ.RateCode,
                         CreateTime = DateTime.Now
                     };
-                    await _orderRepository.InsertAsync(order);
+                    await _repository.GetRepository<SixtCarProReservation>().InsertAsync(order);
                     res.OrderSuc = true;
                     res.SuppOrderId = spmodel.Id;
                     res.SuppOrderStatus = spmodel.Status;
@@ -675,8 +686,8 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             LocationName = pickUp.LocationName,
                             Latitude = pickUp.Latitude,
                             Longitude = pickUp.Longitude,
-                            LocationId = pickUp.LocationId,
-                            CityId = pickUp.CityId,
+                            LocationId = pickUp.LocationId.Value,
+                            CityId = pickUp.CityId.HasValue ? pickUp.CityId.Value : 0,
                             PostalCode = pickUp.PostalCode,
                             StateCode = pickUp.StateCode,
                             CityName = pickUp.CityName,
@@ -693,8 +704,8 @@ namespace HeyTripCarWeb.Supplier.Sixt
                             LocationName = endLoc.LocationName,
                             Latitude = endLoc.Latitude,
                             Longitude = endLoc.Longitude,
-                            LocationId = endLoc.LocationId,
-                            CityId = endLoc.CityId,
+                            LocationId = endLoc.LocationId.Value,
+                            CityId = endLoc.CityId.HasValue ? endLoc.CityId.Value : 0,
                             PostalCode = endLoc.PostalCode,
                             StateCode = endLoc.StateCode,
                             CityName = endLoc.CityName,
@@ -992,7 +1003,7 @@ namespace HeyTripCarWeb.Supplier.Sixt
             try
             {
                 StdQueryOrderRS result = new StdQueryOrderRS();
-                var dbOrder = await _orderRepository.GetByIdAsync(queryOrderRQ.OrderNo);
+                var dbOrder = await _repository.GetRepository<SixtCarProReservation>().Query().FirstOrDefaultAsync(n => n.OrderNo == queryOrderRQ.OrderNo);
                 if (dbOrder == null)
                 {
                     return new StdQueryOrderRS()

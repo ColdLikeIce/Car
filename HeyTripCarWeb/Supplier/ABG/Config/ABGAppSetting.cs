@@ -17,6 +17,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Config
         public string Url { get; set; }
         public string UserID { get; set; }
         public string Password { get; set; }
+        public string Identifier { get; set; }
         public List<SupplierInfo> SupplierInfos { get; set; }
     }
 

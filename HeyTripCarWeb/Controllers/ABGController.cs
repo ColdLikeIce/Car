@@ -32,11 +32,14 @@ namespace HeyTripCarWeb.Controllers
             string token = _jwtHelper.CreateToken(timeout, vehicleRQ.Account, vehicleRQ.Password, _config);
             return new TokenModelRes { ExpireTime = DateTime.Now.AddSeconds(timeout), Token = token };
         }
-        [HttpPost("DecompressString")]
-        public ActionResult<string> DecompressString(string body, int timeout = 15000)
-        {
-            return GZipHelper.DecompressString(body);
-        }
+
+        /* [HttpPost("DecompressString")]
+         public ActionResult<string> DecompressString(string body, int timeout = 15000)
+         {
+             return GZipHelper.DecompressString(body);
+         }
+ */
+
         [HttpPost("GetVehicles")]
         public async Task<List<StdVehicle>> GetVehiclesAsync([FromBody] StdGetVehiclesRQ dto)
         {

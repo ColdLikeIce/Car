@@ -1,5 +1,5 @@
-﻿using CommonCore.Mapper;
-using Dapper;
+﻿using CommonCore.EntityFramework.Common;
+using CommonCore.Mapper;
 using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Share.Dbs;
@@ -12,12 +12,13 @@ using HeyTripCarWeb.Supplier.ABG.Models.RSs;
 using HeyTripCarWeb.Supplier.ABG.Util;
 using HeyTripCarWeb.Supplier.ACE.Util;
 using HeyTripCarWeb.Supplier.Sixt;
+using HeyTripCarWeb.Supplier.Sixt.Models.Dbs;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 using Serilog;
-using StackExchange.Redis;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
@@ -30,7 +31,6 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using Twilio.Rest.Trunking.V1;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Stds;
@@ -55,33 +55,28 @@ namespace HeyTripCarWeb.Supplier.ABG
     /// </summary>
     public class ABGApi : IABGApi
     {
-        private readonly IRepository<ABGLocation> _locRepository;
-        private readonly IRepository<ABG_CreditCardPolicy> _cardRepository;
-        private readonly IRepository<AbgYoungDriver> _yourDriverRepository;
+        /*   private readonly IRepository<ABGLocation> _locRepository;
+           private readonly IRepository<ABG_CreditCardPolicy> _cardRepository;
+           private readonly IRepository<AbgYoungDriver> _yourDriverRepository;*/
         private readonly ABGAppSetting _setting;
         private readonly IMapper _mapper;
-        private readonly IRepository<CarLocationSupplier> _supplierCatRe;
-        private readonly IRepository<CarCity> _CatCityRe;
-        private readonly IRepository<ABGCarProReservation> _proOrdRepository;
-        private readonly IRepository<ABGRateCache> _rateCacheRepository;
+
+        private readonly IBaseRepository<CarRentalDbContext> _cr_repository;
+        private readonly IBaseRepository<CarSupplierDbContext> _repository;
+
+        /* private readonly IRepository<CarLocationSupplier> _supplierCatRe;
+         private readonly IRepository<CarCity> _CatCityRe;
+         private readonly IRepository<ABGCarProReservation> _proOrdRepository;
+         private readonly IRepository<ABGRateCache> _rateCacheRepository;*/
         private readonly IServiceProvider _serviceProvider;
 
-        public ABGApi(IOptions<ABGAppSetting> options, IMapper mapper, IRepository<ABGLocation> locRepository,
-            IRepository<ABGCarProReservation> proOrdRepository, IRepository<ABGRateCache> rateCacheRepository,
-            IServiceProvider serviceProvider, IRepository<ABG_CreditCardPolicy> cardRepository,
-            IRepository<AbgYoungDriver> yourDriverRepository, IRepository<CarLocationSupplier> supplierCatRe,
-            IRepository<CarCity> catCityRe)
+        public ABGApi(IOptions<ABGAppSetting> options, IMapper mapper, IBaseRepository<CarRentalDbContext> cr_repository,
+            IBaseRepository<CarSupplierDbContext> repository)
         {
             _setting = options.Value;
             _mapper = mapper;
-            _locRepository = locRepository;
-            _proOrdRepository = proOrdRepository;
-            _rateCacheRepository = rateCacheRepository;
-            _serviceProvider = serviceProvider;
-            _cardRepository = cardRepository;
-            _yourDriverRepository = yourDriverRepository;
-            _supplierCatRe = supplierCatRe;
-            _CatCityRe = catCityRe;
+            _cr_repository = cr_repository;
+            _repository = repository;
         }
 
         #region 原始接口
@@ -95,7 +90,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             var spLoc = ABGCacheInstance.Instance.GetAllItems();
             if (spLoc.Count == 0)
             {
-                spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier and status = 1", new { supplier = (int)EnumCarSupplier.ABG });
+                spLoc = await _cr_repository.GetRepository<CarLocationSupplier>().Query().Where(n => n.Supplier == (int)EnumCarSupplier.ABG && n.Status == 1).ToListAsync();
                 ABGCacheInstance.Instance.SetLocation(spLoc);
             }
             return spLoc;
@@ -106,7 +101,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             var spLoc = ABGCacheInstance.Instance.GetAllAbgYoungDriver();
             if (spLoc.Count == 0)
             {
-                spLoc = await _yourDriverRepository.GetAllAsync();
+                spLoc = await _repository.GetRepository<AbgYoungDriver>().Query().ToListAsync();
                 ABGCacheInstance.Instance.SetYoungDriver(spLoc);
             }
             return spLoc;
@@ -444,8 +439,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                                 LocationName = pickUp.LocationName,
                                 Latitude = pickUp.Latitude,
                                 Longitude = pickUp.Longitude,
-                                LocationId = pickUp.LocationId,
-                                CityId = pickUp.CityId,
+                                LocationId = pickUp.LocationId.Value,
+                                CityId = pickUp.CityId != null ? pickUp.CityId.Value : 0,
                                 PostalCode = pickUp.PostalCode,
                                 StateCode = pickUp.StateCode,
                                 CityName = pickUp.CityName,
@@ -461,8 +456,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                                 LocationName = endLoc.LocationName,
                                 Latitude = endLoc.Latitude,
                                 Longitude = endLoc.Longitude,
-                                LocationId = endLoc.LocationId,
-                                CityId = endLoc.CityId,
+                                LocationId = endLoc.LocationId.Value,
+                                CityId = endLoc.CityId != null ? endLoc.CityId.Value : 0,
                                 PostalCode = endLoc.PostalCode,
                                 StateCode = endLoc.StateCode,
                                 CityName = endLoc.CityName,
@@ -508,7 +503,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         var rateCode = $"UserVerdorType_{rentCore.PickUpLocation.LocationCode}_{rentCore.ReturnLocation.LocationCode}";
                         rateCode = rateCode + $"_{veCore.Vehicle.VehType.VehicleCategory}_{veCore.Vehicle.VehClass.Size}";
                         rateCode = rateCode + $"_{std.VehicleCode}_{veCore.RentalRate.RateQualifier.RateCategory}";
-                        rateCode = rateCode + $"_{veCore.RentalRate.RateQualifier.RateQualifierValue}";
+                        rateCode = rateCode + $"_{veCore.RentalRate.RateQualifier.RateQualifierValue}_{std.TotalCharge.TotalAmount}_{std.TotalCharge.Currency}";
 
                         std.RateCode = rateCode;
                         //result.Add(std);
@@ -642,9 +637,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                     Version = "1.0",
                     POS = new POS
                     {
-                        Source = new Source
+                        Source = new List<Source>
                         {
-                            RequestorID = new RequestorID { ID = supper.DefaultIATA, Type = 5 }
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = _setting.UserID, Type = 1 }
+                            },
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = supper.DefaultIATA, Type = 5 }
+                            },
                         }
                     },
                     VehLocSearchCriterion = new VehLocSearchCriterion
@@ -967,9 +969,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                 Version = "1.0",
                 POS = new POS
                 {
-                    Source = new Source
+                    Source = new List<Source>
                     {
-                        RequestorID = new RequestorID { ID = supplierInfo.DefaultIATA, Type = 5 }
+                        new Source
+                        {
+                            RequestorID = new RequestorID { ID = _setting.UserID, Type = 1 }
+                        },
+                        new Source
+                        {
+                            RequestorID = new RequestorID { ID = supplierInfo.DefaultIATA, Type = 5 }
+                        }
                     }
                 },
                 RentalInfo = new RentalInfo
@@ -1121,7 +1130,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                 PayType = supplier.PayType.ToString(),
                 RateCode = originModel.RateCode
             };
-            await _proOrdRepository.InsertAsync(order);
+            await _repository.GetRepository<ABGCarProReservation>().InsertAsync(order);
             result.OrderSuc = true;
             result.SuppOrderId = spmodel.VehResRSCore.VehReservation.VehSegmentCore.ConfID.ID;
             /*          result.SuppOrderStatus = "";
@@ -1135,6 +1144,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         public async Task<StdCancelOrderRS> CancelOrderAsync(ABGCarProReservation order, ABG_OTAVehCancelRQ cancelOrderRQ, int timeout = 15000)
         {
             StdCancelOrderRS result = new StdCancelOrderRS();
+
             var res = BuildEnvelope(new CommonRequest { ABG_OTAVehCancelRQ = cancelOrderRQ, Type = ApiEnum.Cancel });
             var spModel = ABGXmlHelper.GetResponse<ABG_OTA_VehCancelRS>(res);
             if (spModel == null)
@@ -1154,8 +1164,9 @@ namespace HeyTripCarWeb.Supplier.ABG
                 result.Currency = order.CurrencyCode;
 
                 result.CancelSuc = true;
-                await _proOrdRepository.UpdateBySqlAsync("update ABG_CarProReservation set CancelTime=@CancelTime,OrderStatus=@OrderStatus " +
-                "where orderno = @orderno", new { CancelTime = DateTime.Now, OrderStatus = "cancelled", orderno = order.OrderNo });
+                order.CancelTime = DateTime.Now;
+                order.OrderStatus = "cancelled";
+                await _repository.GetRepository<ABGCarProReservation>().UpdateAsync(order);
             }
             else
             {
@@ -1228,9 +1239,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                     Version = "1.0",
                     POS = new POS
                     {
-                        Source = new Source
+                        Source = new List<Source>
                         {
-                            RequestorID = new RequestorID { ID = dto.SupplierInfo.DefaultIATA, Type = 5 }
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = _setting.UserID, Type = 1 }
+                            },
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = dto.SupplierInfo.DefaultIATA, Type = 6 }
+                            }
                         }
                     },
                     VehAvailRQCore = new VehAvailRQCore
@@ -1310,23 +1328,10 @@ namespace HeyTripCarWeb.Supplier.ABG
             List<StdVehicle> res = new List<StdVehicle>();
             try
             {
-                var dbModel = new ABGRateCache();
                 var cache_key = "";
                 var md5Key = "";
                 //根据配置确定有没有缓存
-                if (_setting.PassMin > 0)
-                {
-                    cache_key = $"{vehicleRQ.PickUpLocationCode}_{vehicleRQ.PickUpDateTime.ToString("yyyy-MM-ddTHH:mm:ss")}_{vehicleRQ.ReturnLocationCode}_{vehicleRQ.ReturnDateTime.ToString("yyyy-MM-ddTHH:mm:ss")}";//"HK_2024-04-28T10:00:00_BKK_2024-05-01T10:00:00_BKK_30"
-                    md5Key = Md5Helper.ComputeMD5Hash(cache_key);
-                    dbModel = await _rateCacheRepository.GetByIdAsync("select * from ABG_RateCache where SearchMD5 = @SearchMD5", new { SearchMD5 = md5Key });
-                    if (dbModel != null && dbModel.ExpireTime > DateTime.Now)
-                    {
-                        var cache = GZipHelper.DecompressString(dbModel.RateCache);
-                        //修改缓存
-                        await _rateCacheRepository.UpdateBySqlAsync("update ABG_RateCache set searchcount=searchcount+1 where SearchMD5 = @SearchMD5", new { SearchMD5 = md5Key });
-                        return JsonConvert.DeserializeObject<List<StdVehicle>>(cache);
-                    }
-                }
+
                 List<StdVehicleExtend> firstList = new List<StdVehicleExtend>();
                 var locList = await GetAllLocation();
                 var (startLocList, endLocList) = await CommonLocationHelper.GetLocaiton(vehicleRQ, locList);
@@ -1337,9 +1342,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                 var codeList = startLocList.Select(n => $"'{n.SuppLocId}'").ToList();
                 codeList.AddRange(endLocList.Select(n => $"'{n.SuppLocId}'").ToList());
 
-                var youngDriverList = await _yourDriverRepository.GetListBySqlAsync($"select * from Abg_YoungDriver where code in ({string.Join(",", codeList.Distinct().ToList())})", null);
-
-                //var youngDriverList = await GetAllYoungDriverAsync();
+                var youngDriverList = await _repository.GetRepository<AbgYoungDriver>().Query().Where(n => startLocList.Select(n => n.SuppLocId).Contains(n.Code) || endLocList.Select(n => n.SuppLocId).Contains(n.Code)).ToListAsync();
                 //usertodo 需要改成并发
                 var iataList = _setting.SupplierInfos;
                 int batchSize = 10; // 限制 10个任务跑
@@ -1419,32 +1422,32 @@ namespace HeyTripCarWeb.Supplier.ABG
                     await BuildTermsAndConditions(item);
                     // 在这里执行一些操作
                 });
-                if (_setting.PassMin > 0 && res.Count > 0)
-                {
-                    var dbCache = GZipHelper.Compress(JsonConvert.SerializeObject(res));
-                    var rateMD5 = Md5Helper.ComputeMD5Hash(dbCache);
-                    if (dbModel != null)
-                    {
-                        await _rateCacheRepository.UpdateBySqlAsync("update ABG_RateCache set searchcount=searchcount+1,RateMD5=@RateMD5,RateCache=@RateCache,PreUpdateTime=updatetime,updatetime=@updatetime,ExpireTime=@ExpireTime where SearchMD5=@SearchMD5",
-                            new { RateMD5 = rateMD5, RateCache = dbCache, updatetime = DateTime.Now, ExpireTime = DateTime.Now.AddMinutes(_setting.PassMin), SearchMD5 = md5Key });
-                    }
-                    else
-                    {
-                        ABGRateCache aCERateCache = new ABGRateCache
-                        {
-                            SearchMD5 = md5Key,
-                            SearchKey = cache_key,
-                            SearchCount = 1,
-                            RateCache = dbCache,
-                            RateMD5 = rateMD5,
-                            CanSaleCount = res.Count,
-                            UpdateTime = DateTime.Now,
-                            PreUpdateTime = DateTime.Now,
-                            ExpireTime = DateTime.Now.AddMinutes(_setting.PassMin)
-                        };
-                        await _rateCacheRepository.InsertAsync(aCERateCache);
-                    }
-                }
+                /* if (_setting.PassMin > 0 && res.Count > 0)
+                 {
+                     var dbCache = GZipHelper.Compress(JsonConvert.SerializeObject(res));
+                     var rateMD5 = Md5Helper.ComputeMD5Hash(dbCache);
+                     if (dbModel != null)
+                     {
+                         await _rateCacheRepository.UpdateBySqlAsync("update ABG_RateCache set searchcount=searchcount+1,RateMD5=@RateMD5,RateCache=@RateCache,PreUpdateTime=updatetime,updatetime=@updatetime,ExpireTime=@ExpireTime where SearchMD5=@SearchMD5",
+                             new { RateMD5 = rateMD5, RateCache = dbCache, updatetime = DateTime.Now, ExpireTime = DateTime.Now.AddMinutes(_setting.PassMin), SearchMD5 = md5Key });
+                     }
+                     else
+                     {
+                         ABGRateCache aCERateCache = new ABGRateCache
+                         {
+                             SearchMD5 = md5Key,
+                             SearchKey = cache_key,
+                             SearchCount = 1,
+                             RateCache = dbCache,
+                             RateMD5 = rateMD5,
+                             CanSaleCount = res.Count,
+                             UpdateTime = DateTime.Now,
+                             PreUpdateTime = DateTime.Now,
+                             ExpireTime = DateTime.Now.AddMinutes(_setting.PassMin)
+                         };
+                         await _rateCacheRepository.InsertAsync(aCERateCache);
+                     }
+                 }*/
                 res = _mapper.Map<StdVehicleExtend, StdVehicle>(firstList);
 
                 return res;
@@ -1472,7 +1475,8 @@ namespace HeyTripCarWeb.Supplier.ABG
         {
             try
             {
-                var proOrder = await _proOrdRepository.GetByIdAsync("select * from ABG_CarProReservation where orderNo = @orderNo", new { orderNo = queryOrderRQ.OrderNo });
+                var proOrder = await _repository.GetRepository<ABGCarProReservation>().Query().FirstOrDefaultAsync(n => n.OrderNo == queryOrderRQ.OrderNo);
+
                 if (proOrder == null)
                 {
                     return new StdQueryOrderRS
@@ -1486,9 +1490,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                     Version = "1.0",
                     POS = new POS
                     {
-                        Source = new Source
+                        Source = new List<Source>
                         {
-                            RequestorID = new RequestorID { ID = proOrder.VendorCode, Type = 5 }
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = _setting.UserID, Type = 1 }
+                            },
+                            new Source
+                            {
+                                  RequestorID = new RequestorID { ID = proOrder.VendorCode, Type = 6 }
+                            }
                         }
                     },
                     VehRetResRQCore = new VehRetResRQCore
@@ -1521,7 +1532,7 @@ namespace HeyTripCarWeb.Supplier.ABG
         {
             try
             {
-                var proOrder = await _proOrdRepository.GetByIdAsync("select * from ABG_CarProReservation where orderNo = @orderNo", new { orderNo = cancelOrderRQ.OrderNo });
+                var proOrder = await _repository.GetRepository<ABGCarProReservation>().Query().FirstOrDefaultAsync(n => n.OrderNo == cancelOrderRQ.OrderNo);
                 if (proOrder == null)
                 {
                     return new StdCancelOrderRS
@@ -1535,9 +1546,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                     Version = "1.0",
                     POS = new POS
                     {
-                        Source = new Source
+                        Source = new List<Source>
                         {
-                            RequestorID = new RequestorID { ID = proOrder.VendorCode, Type = 5 }
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = _setting.UserID, Type = 1 }
+                            },
+                            new Source
+                            {
+                                 RequestorID = new RequestorID { ID = proOrder.VendorCode, Type = 6 }
+                            }
                         }
                     },
                     VehCancelRQCore = new VehCancelRQCore
@@ -1596,7 +1614,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                 {
                     throw new Exception("供应商解析不正确");
                 }
-                var dbOrder = await _proOrdRepository.GetByIdAsync(createOrderRQ.OrderNo);
+                var dbOrder = await _repository.GetRepository<ABGCarProReservation>().Query().FirstOrDefaultAsync(n => n.OrderNo == createOrderRQ.OrderNo);
                 if (dbOrder != null)
                 {
                     return new StdCreateOrderRS()
@@ -1611,9 +1629,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                     Version = "1.0",
                     POS = new POS
                     {
-                        Source = new Source
+                        Source = new List<Source>
                         {
-                            RequestorID = new RequestorID { ID = secSupplier.IATA, Type = 5 }
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = _setting.UserID, Type = 1 }
+                            },
+                            new Source
+                            {
+                                RequestorID = new RequestorID { ID = secSupplier.IATA, Type = 6 }
+                            }
                         }
                     },
                     VehResRQCore = new VehResRQCore
@@ -1651,9 +1676,29 @@ namespace HeyTripCarWeb.Supplier.ABG
                             VehGroup = new VehGroup { GroupValue = ratecodeList[5], GroupType = "SIPP" },
                         },
 
-                        RateQualifier = new RateQualifier { RateQualifierValue = ratecodeList.LastOrDefault() }
-                    }
+                        RateQualifier = new RateQualifier { RateCategory = ratecodeList[6], RateQualifierValue = ratecodeList[7] }
+                    },
                 };
+                if (ratecodeList[0] == "1" || ratecodeList[0] == "3")
+                {
+                    postModel.VehResRQInfo = new VehResRQInfo
+                    {
+                        RentalPaymentPref = new RentalPaymentPref
+                        {
+                            Voucher = new CreateVoucher
+                            {
+                                Identifier = _setting.Identifier,
+                                ValueType = "FixedValue",
+                                ElectronicIndicator = true
+                            },
+                            PaymentAmount = new PaymentAmount
+                            {
+                                Amount = Convert.ToDecimal(ratecodeList[8]),
+                                CurrencyCode = ratecodeList[9]
+                            }
+                        }
+                    };
+                }
                 if (createOrderRQ.Extras != null && createOrderRQ.Extras.Count > 0)
                 {
                     List<SpecialEquipPref> equips = new List<SpecialEquipPref>();
@@ -1701,11 +1746,10 @@ namespace HeyTripCarWeb.Supplier.ABG
 
         public async Task<bool> InitLocationOperationTimes()
         {
-            var locList = await _locRepository.GetAllAsync();
+            var locList = await _repository.GetRepository<ABGLocation>().Query().ToListAsync();
             var list = locList.ToList();
             foreach (var item in _setting.SupplierInfos)
             {
-                var dbList = await _locRepository.GetAllAsync();
                 var filename = "Locs_hrs.dat";
                 var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}/{filename}");
                 await BuildLocationOperationTimes(path, list);
@@ -1719,9 +1763,12 @@ namespace HeyTripCarWeb.Supplier.ABG
         /// <returns></returns>
         public async Task InitSupplierLocaiton()
         {
-            var spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.ABG });
-            var allCity = await _CatCityRe.GetAllAsync();
-            var locList = await _locRepository.GetAllAsync();
+            var spLoc = await _cr_repository.GetRepository<CarLocationSupplier>().Query().Where(n => n.Supplier == (int)EnumCarSupplier.ABG).ToListAsync();
+
+            var allCity = await _cr_repository.GetRepository<CarCity>().Query().ToListAsync();
+
+            var locList = await _repository.GetRepository<ABGLocation>().Query().ToListAsync();
+            List<CarLocationSupplier> updateList = new List<CarLocationSupplier>();
             foreach (var item in locList)
             {
                 /* if (item.Latitude == null || item.Longitude == null)
@@ -1758,14 +1805,15 @@ namespace HeyTripCarWeb.Supplier.ABG
                         Telephone = item.PhoneNumber,
                         Email = item.Email,
                         OperationTime = item.OperationTimes,
-                        Supplier = ((int)EnumCarSupplier.ABG).ToString(),
+                        Supplier = (int)EnumCarSupplier.ABG,
                         SuppLocId = item.LocationCode,
                         Vendor = (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(item.VendorName),
                         VendorLocId = item.LocationCode,
-                        CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                        CreateTime = DateTime.Now,
+                        UpdateTime = DateTime.Now,
+                        Status = 0
                     };
-                    await _supplierCatRe.InsertAsync(newitem);
+                    updateList.Add(newitem);
                 }
                 else
                 {
@@ -1782,14 +1830,20 @@ namespace HeyTripCarWeb.Supplier.ABG
                     spModel.Telephone = item.PhoneNumber;
                     spModel.Email = item.Email;
                     spModel.OperationTime = item.OperationTimes;
-                    spModel.Supplier = ((int)EnumCarSupplier.ABG).ToString();
+                    spModel.Supplier = (int)EnumCarSupplier.ABG;
                     spModel.SuppLocId = item.LocationCode;
                     spModel.Vendor = (int)EnumHelper.GetEnumTypeByStr<EnumCarVendor>(item.VendorName);
                     spModel.VendorLocId = item.LocationCode;
                     //spModel.CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    spModel.UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    await _supplierCatRe.UpdateAsync(spModel, "status");
+                    spModel.UpdateTime = DateTime.Now;
+                    updateList.Add(spModel);
                 }
+            }
+            await _cr_repository.GetRepository<CarLocationSupplier>().BatchUpdateAsync(updateList.Where(n => n.LocationId > 0).ToList());
+            var insertModel = updateList.Where(n => n.LocationId == 0 || n.LocationId == null).ToList();
+            if (insertModel.Count > 0)
+            {
+                await _cr_repository.GetRepository<CarLocationSupplier>().BatchInsertAsync(insertModel);
             }
         }
 
@@ -1798,7 +1852,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             //待改成 批量插入
             foreach (var item in _setting.SupplierInfos)
             {
-                var dbList = await _locRepository.GetAllAsync();
+                var dbList = await _repository.GetRepository<ABGLocation>().Query().ToListAsync();
                 var filename = "Locs.dat";
                 var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}/{filename}");
                 await BuildLocationByFile(path, item.Vendor, dbList);
@@ -1816,6 +1870,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             //如果文件存在
             if (File.Exists(path))
             {
+                List<ABGLocation> changeList = new List<ABGLocation>();
                 //读取文件内容
                 IEnumerable<string> line = File.ReadLines(path);
                 foreach (var item in line)
@@ -1850,16 +1905,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                         if (dbModel == null)
                         {
                             location.CreateTime = DateTime.Now;
-
-                            await _locRepository.InsertAsync(location);
+                            changeList.Add(location);
                         }
                         else
                         {
                             if (dbModel.hashKey != hashKey)
                             {
-                                location.LocationCode = dbModel.LocationCode;
-                                location.UpdateTime = DateTime.Now;
-                                await _locRepository.UpdateAsync(location, "CreateTime,OperationTimes");
+                                SetPropertiesFromArray(dbModel, spiltLine, 1);
+                                dbModel.hashKey = hashKey;
+                                dbModel.UpdateTime = DateTime.Now;
+                                changeList.Add(dbModel);
                             }
                         }
                     }
@@ -1868,6 +1923,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                         Log.Information($"初始化地址失败{item}");
                     }
                 }
+                await _repository.GetRepository<ABGLocation>().BatchUpdateAsync(changeList.Where(n => n.LocationId > 0).ToList());
+                await _repository.GetRepository<ABGLocation>().BatchInsertAsync(changeList.Where(n => n.LocationId == null || n.LocationId == 0).ToList());
             }
         }
 
@@ -1905,6 +1962,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             {
                 //读取文件内容
                 IEnumerable<string> line = File.ReadLines(path);
+                List<ABGLocation> updateList = new List<ABGLocation>();
                 foreach (var item in line)
                 {
                     if (item.Contains("HOURS"))
@@ -1956,8 +2014,9 @@ namespace HeyTripCarWeb.Supplier.ABG
                         var dbmodel = locList.FirstOrDefault(n => n.LocationCode == spiltLine[1]);
                         if (dbmodel != null && dbmodel.operationtimehashkey != hashKey)
                         {
-                            await _locRepository.UpdateBySqlAsync($"update abg_location_new set OperationTimes=@json,operationtimehashkey=@hashkey  where locationcode = @locationcode", new { json = json, locationcode = spiltLine[1], hashkey = hashKey });
-                            Log.Information($"update 【{spiltLine[1]}】OperationTimes success!");
+                            dbmodel.operationtimehashkey = hashKey;
+                            dbmodel.UpdateTime = DateTime.Now;
+                            updateList.Add(dbmodel);
                         }
                     }
                     catch (Exception ex)
@@ -1965,6 +2024,7 @@ namespace HeyTripCarWeb.Supplier.ABG
                         Log.Error($"更新开张时间报错");
                     }
                 }
+                await _repository.GetRepository<ABGLocation>().BatchUpdateAsync(updateList);
             }
         }
 
@@ -1977,7 +2037,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             //待改成 批量插入
             foreach (var item in _setting.SupplierInfos)
             {
-                var dbList = await _cardRepository.GetAllAsync();
+                var dbList = await _repository.GetRepository<ABG_CreditCardPolicy>().Query().ToListAsync();
                 var filename = "CreditCard.dat";
                 var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{datPath}/{item.Vendor}/{filename}");
                 await BuildCreditCardPolicyByFile(path, dbList);
@@ -1994,6 +2054,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             //如果文件存在
             if (File.Exists(path))
             {
+                List<ABG_CreditCardPolicy> changeList = new List<ABG_CreditCardPolicy>();
                 //读取文件内容
                 IEnumerable<string> line = File.ReadLines(path);
                 foreach (var item in line)
@@ -2017,15 +2078,16 @@ namespace HeyTripCarWeb.Supplier.ABG
                             {
                                 continue;
                             }
-                            await _cardRepository.InsertAsync(aBG_CreditCard);
+                            changeList.Add(aBG_CreditCard);
                         }
                         else
                         {
                             if (dbmodel.hashkey != hashKey)
                             {
-                                aBG_CreditCard.ID = dbmodel.ID;
-
-                                await _cardRepository.UpdateAsync(aBG_CreditCard, "CreatTime");
+                                SetPropertiesFromArray(dbmodel, spiltLine, 0);
+                                dbmodel.hashkey = hashKey;
+                                dbmodel.Updatetime = DateTime.Now;
+                                changeList.Add(dbmodel);
                             }
                         }
                     }
@@ -2034,6 +2096,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                         Log.Error($"信用卡政策插入失败{ex.Message}");
                     }
                 }
+                await _repository.GetRepository<ABG_CreditCardPolicy>().BatchUpdateAsync(changeList.Where(n => n.ID > 0).ToList());
+                await _repository.GetRepository<ABG_CreditCardPolicy>().BatchInsertAsync(changeList.Where(n => n.ID == null || n.ID == 0).ToList());
             }
         }
 
@@ -2061,6 +2125,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             //如果文件存在
             if (File.Exists(path))
             {
+                List<AbgYoungDriver> changeList = new List<AbgYoungDriver>();
                 //读取文件内容
                 IEnumerable<string> line = File.ReadLines(path);
                 foreach (var item in line)
@@ -2088,13 +2153,17 @@ namespace HeyTripCarWeb.Supplier.ABG
                         if (dbModel == null)
                         {
                             youngDriver.HashKey = enHash;
-                            await _yourDriverRepository.InsertAsync(youngDriver);
+                            changeList.Add(youngDriver);
                         }
                         else
                         {
-                            youngDriver.ID = dbModel.ID;
-                            await _yourDriverRepository.UpdateAsync(dbModel);
-                            //update todo
+                            if (dbModel.HashKey != enHash)
+                            {
+                                dbModel.HashKey = enHash;
+                                SetPropertiesFromArray(dbModel, spiltLine, 1);
+                                dbModel.UpdateTime = DateTime.Now;
+                                changeList.Add(youngDriver);
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -2102,6 +2171,8 @@ namespace HeyTripCarWeb.Supplier.ABG
                         Log.Error($"插入youngDriver失败{ex.Message}");
                     }
                 }
+                await _repository.GetRepository<AbgYoungDriver>().BatchUpdateAsync(changeList.Where(n => n.ID > 0).ToList());
+                await _repository.GetRepository<AbgYoungDriver>().BatchInsertAsync(changeList.Where(n => n.ID == null || n.ID == 0).ToList());
             }
         }
 
@@ -2190,7 +2261,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             await InitLocation();
             await InitLocationOperationTimes();
             await InitSupplierLocaiton();
-            await InitCreditCardPolicy();
+            //await InitCreditCardPolicy();
             await InitYoungDriver();
             ABGCacheInstance.Instance.SetYoungDriver(new List<AbgYoungDriver>());
             ABGCacheInstance.Instance.SetLocation(new List<CarLocationSupplier>());
@@ -2207,7 +2278,7 @@ namespace HeyTripCarWeb.Supplier.ABG
             List<StdVehicle> res = new List<StdVehicle>();
             int batchSize = 4; // 限制 10个任务跑
             List<Task> runTasks = new List<Task>();
-            var youngDriverList = await _yourDriverRepository.GetAllAsync();
+            var youngDriverList = await _repository.GetRepository<AbgYoungDriver>().Query().ToListAsync();
             foreach (var loc in location)
             {
                 foreach (var iata in iataList)

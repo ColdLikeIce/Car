@@ -1,5 +1,4 @@
-﻿using CommonCore.Mapper;
-using Dapper;
+﻿/*using CommonCore.Mapper;
 using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Supplier.ACE.Config;
@@ -11,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic.FileIO;
 using Newtonsoft.Json;
 using Serilog;
-using StackExchange.Redis;
 using System;
 using System.Drawing;
 using System.Net;
@@ -21,7 +19,6 @@ using System.Threading;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Stds;
-using static Dapper.SqlMapper;
 
 namespace HeyTripCarWeb.Supplier.ACE
 {
@@ -531,8 +528,8 @@ RuleType=""3"" />
                             std.PictureURL = veCore.Vehicle.PictureURL;
                             std.TransmissionType = veCore.Vehicle.TransmissionType == "Manual" ? EnumCarTransmissionType.Manual : EnumCarTransmissionType.Automatic;
 
-                            /*   std.MinDriverAge = 0; //userloss
-                               std.MaxDriverAge = 99; //userloss*/
+                            *//*   std.MinDriverAge = 0; //userloss
+                               std.MaxDriverAge = 99; //userloss*//*
                             var rentalRate = veCore.RentalRate;
                             var rateDistance = rentalRate.RateDistance;
                             //里程限制
@@ -1356,14 +1353,14 @@ DefaultInd=""true"" />
                 DocInfo = JsonConvert.SerializeObject(customer.Primary.Document),
                 CreateTime = DateTime.Now,
                 OrderStatus = "Comfirmed", //usertodo
-                /*    CancelTime = DateTime.Now,
-                    ConfirmTime = DateTime.Now*/
+                *//*    CancelTime = DateTime.Now,
+                    ConfirmTime = DateTime.Now*//*
             };
             await _aceOrderRepository.InsertAsync(order);
-            /* if (loc.Count > 1)
+            *//* if (loc.Count > 1)
              {
                  order.ReturnLocation_Code = loc.LastOrDefault().Code;
-             }*/
+             }*//*
             result.OrderSuc = true;
             result.SuppOrderId = spModel.VehResRSCore.VehReservation.VehSegmentCore.ConfID.ID;
             result.SuppOrderStatus = "";
@@ -1801,9 +1798,9 @@ DefaultInd=""true"" />
                     Telephone = new Models.RQs.Telephone
                     {
                         PhoneNumber = createOrderRQ.ContactNumber,
-                        /* CountryAccessCode=createOrderRQ.BillingAddress.Country
+                        *//* CountryAccessCode=createOrderRQ.BillingAddress.Country
                          AreaCityCode="",
-                         Extension=""*/
+                         Extension=""*//*
                     },
                     Email = createOrderRQ.Email,
                     Address = new Models.RQs.Address
@@ -1846,8 +1843,8 @@ DefaultInd=""true"" />
                         PickUpDateTime = Convert.ToDateTime(createOrderRQ.PickUpDateTime),
                         ReturnDateTime = Convert.ToDateTime(createOrderRQ.ReturnDateTime),
                         //出发地 目的地方
-                        /* PickUpLocation = new PickUpLocation { LocationCode = vehicleRQ.PickUpLocationCode },
-                         ReturnLocation = new PickUpLocation { LocationCode = vehicleRQ.ReturnLocationCode }*/
+                        *//* PickUpLocation = new PickUpLocation { LocationCode = vehicleRQ.PickUpLocationCode },
+                         ReturnLocation = new PickUpLocation { LocationCode = vehicleRQ.ReturnLocationCode }*//*
                     },
                     Customer = customer
                 },
@@ -2036,4 +2033,4 @@ DefaultInd=""true"" />
 
         #endregion 地址门店构建
     }
-}
+}*/

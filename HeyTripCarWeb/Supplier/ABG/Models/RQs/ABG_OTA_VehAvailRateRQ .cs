@@ -28,7 +28,7 @@ namespace HeyTripCarWeb.Supplier.ABG.Models.RQs
     public class POS
     {
         [XmlElement(ElementName = "Source")]
-        public Source Source { get; set; }
+        public List<Source> Source { get; set; }
     }
 
     // 子类 VehType

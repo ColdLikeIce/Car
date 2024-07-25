@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34723.18
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeyTripCarWeb", "HeyTripCarWeb\HeyTripCarWeb.csproj", "{F252D44E-CF66-4D38-ABCB-AD2648621D4D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HeyTripCarWeb", "HeyTripCarWeb\HeyTripCarWeb.csproj", "{F252D44E-CF66-4D38-ABCB-AD2648621D4D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommonCore", "CommonCore\CommonCore.csproj", "{23381B7D-D2CD-43A8-A2B9-2BA519558740}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{F252D44E-CF66-4D38-ABCB-AD2648621D4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F252D44E-CF66-4D38-ABCB-AD2648621D4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F252D44E-CF66-4D38-ABCB-AD2648621D4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23381B7D-D2CD-43A8-A2B9-2BA519558740}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23381B7D-D2CD-43A8-A2B9-2BA519558740}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23381B7D-D2CD-43A8-A2B9-2BA519558740}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23381B7D-D2CD-43A8-A2B9-2BA519558740}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

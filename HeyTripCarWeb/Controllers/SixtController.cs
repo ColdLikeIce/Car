@@ -13,6 +13,7 @@ namespace HeyTripCarWeb.Controllers
 {
     [ApiController]
     [Route("/api/Sixt")]
+    [Authorize]
     public class SixtController : ControllerBase
     {
         private readonly ISixtApi _carSupplierApi;
@@ -29,6 +30,7 @@ namespace HeyTripCarWeb.Controllers
         }
 
         [HttpPost("GetVehicles")]
+        [Authorize]
         public async Task<List<StdVehicle>> GetVehiclesAsync([FromBody] StdGetVehiclesRQ dto)
         {
             return await _carSupplierApi.GetVehiclesAsync(dto);
@@ -42,6 +44,7 @@ namespace HeyTripCarWeb.Controllers
         }
 
         [HttpPost("CancelOrder")]
+        [Authorize]
         public async Task<StdCancelOrderRS> CancelOrderAsync([FromBody] StdCancelOrderRQ dto)
         {
             return await _carSupplierApi.CancelOrderAsync(dto);

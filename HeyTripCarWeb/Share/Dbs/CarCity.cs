@@ -1,11 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HeyTripCarWeb.Share.Dbs
 {
-    [Table("CarRental.dbo.car_city")]
+    [Table("car_city")]
     public class CarCity
     {
+        [Key]
         public int CityId { get; set; }
+
         public string CityNameEn { get; set; }
     }
 }

@@ -8,9 +8,9 @@ namespace HeyTripCarWeb.Supplier.BarginCar.Model.Dbs
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
+        public long Id { get; set; }
 
-        public int? AgeId { get; set; }
+        public long? AgeId { get; set; }
         public int? DriverAge { get; set; }
         public string? IsDefault { get; set; }
     }

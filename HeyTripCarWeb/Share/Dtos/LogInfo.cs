@@ -19,6 +19,7 @@
         ACE = 2,
         Bargin = 3,
         Sixt = 4,
+        NZ = 5,
     }
 
     public enum ApiEnum

@@ -8,7 +8,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar.Model.Dbs
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
+        public long Id { get; set; }
 
         public int? CategoryTypesId { get; set; }
         public string? VehicleCategoryType { get; set; }

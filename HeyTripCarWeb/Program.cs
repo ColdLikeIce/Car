@@ -8,11 +8,13 @@ using HeyTripCarWeb.Supplier.ABG.Config;
 using HeyTripCarWeb.Supplier.ABG.Worker;
 using HeyTripCarWeb.Supplier.ACE.Config;
 using HeyTripCarWeb.Supplier.BarginCar.Config;
+using HeyTripCarWeb.Supplier.NZ.Config;
 using HeyTripCarWeb.Supplier.Sixt.Config;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -22,6 +24,7 @@ using System.Data;
 using System.Reflection;
 using System.Text;
 
+var envir = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 var configuration = new ConfigurationBuilder()
 .SetBasePath(Directory.GetCurrentDirectory())
 .AddJsonFile("Serilog.json")
@@ -32,7 +35,7 @@ var logger = new LoggerConfiguration()
    .CreateLogger();
 Log.Logger = logger;
 var builder = WebApplication.CreateBuilder(args);
-Log.Information("Starting NKFlight WebApi");
+Log.Information($"Starting Car {envir} WebApi");
 //注册服务
 builder.Services.AddAuthentication(options =>
 {
@@ -108,14 +111,21 @@ builder.Services.Configure<ABGAppSetting>(builder.Configuration.GetSection("ABGA
 builder.Services.Configure<AceAppSetting>(builder.Configuration.GetSection("AceAppSetting"));
 builder.Services.Configure<BarginCarAppSetting>(builder.Configuration.GetSection("BarginCarAppSetting"));
 builder.Services.Configure<SixtAppSetting>(builder.Configuration.GetSection("SixtAppSetting"));
-// 添加数据库连接
-string connectionString = builder.Configuration.GetConnectionString("DbConnection");
-builder.Services.AddTransient<IDbConnection>(sp => new SqlConnection(connectionString));
+builder.Services.Configure<NZCarAppSetting>(builder.Configuration.GetSection("NZCarAppSetting"));
 
+builder.Services.AddAutoIoc(typeof(IScopedDependency), LifeCycle.Scoped)
+       .AddAutoIoc(typeof(ISingletonDependency), LifeCycle.Singleton)
+       .AddAutoIoc(typeof(ITransientDependency), LifeCycle.Transient)
+       .AddMapper();
 // 添加数据访问层
-builder.Services.AddTransient(typeof(IRepository<>), typeof(DapperRepository<>));
-builder.Services.AddScopedDependencies(Assembly.GetExecutingAssembly()).AddMapper();
-
+builder.Services.AddHyTripEntityFramework<CarRentalDbContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CarRentalDb"));
+});
+builder.Services.AddHyTripEntityFramework<CarSupplierDbContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CarSupplierDb"));
+});
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

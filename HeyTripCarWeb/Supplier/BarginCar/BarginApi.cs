@@ -1,4 +1,5 @@
-﻿using CommonCore.Mapper;
+﻿using CommonCore.EntityFramework.Common;
+using CommonCore.Mapper;
 using HeyTripCarWeb.Db;
 using HeyTripCarWeb.Share;
 using HeyTripCarWeb.Share.Dbs;
@@ -13,18 +14,19 @@ using HeyTripCarWeb.Supplier.BarginCar.Model.RSs;
 using HeyTripCarWeb.Supplier.BarginCar.Util;
 using HeyTripCarWeb.Supplier.Sixt.Models.RSs;
 using HeyTripCarWeb.Supplier.Sixt.Util;
+using Microsoft.AspNetCore.Server.IISIntegration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
 using Serilog;
-using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.Drawing.Printing;
+using System.Linq;
 using XiWan.Car.Business.Pay.PingPong.Models.RQs;
 using XiWan.Car.BusinessShared.Enums;
 using XiWan.Car.BusinessShared.Stds;
-using static Dapper.SqlMapper;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace HeyTripCarWeb.Supplier.BarginCar
 {
@@ -32,29 +34,38 @@ namespace HeyTripCarWeb.Supplier.BarginCar
     {
         private readonly BarginCarAppSetting _setting;
         private readonly IMapper _mapper;
-        private readonly IRepository<CarLocationSupplier> _supplierCatRe;
-        private readonly IRepository<CarCity> _CatCityRe;
-        private readonly IRepository<BarginCategoryTypes> _cateRe;
-        private readonly IRepository<BargainLocation> _locRepository;
-        private readonly IRepository<BarginDriverAge> _driverAges;
-        private readonly IRepository<BarginCarOrder> _order;
+
+        private readonly IBaseRepository<CarRentalDbContext> _cr_repository;
+        private readonly IBaseRepository<CarSupplierDbContext> _repository;
 
         private static EnumCarVendor _vendor = EnumCarVendor.Bargain_Car_Rentals;
 
-        public BarginApi(IOptions<BarginCarAppSetting> options, IMapper mapper, IRepository<CarLocationSupplier> supplierCatRe,
-           IRepository<CarCity> catCityRe, IRepository<BargainLocation> locRepository, IRepository<BarginCategoryTypes> cateRe
-            , IRepository<BarginDriverAge> driverAges, IRepository<BarginCarOrder> order)
+        public BarginApi(IOptions<BarginCarAppSetting> options, IMapper mapper, IBaseRepository<CarRentalDbContext> cr_repository,
+            IBaseRepository<CarSupplierDbContext> repository)
         {
             _setting = options.Value;
             _mapper = mapper;
-            _supplierCatRe = supplierCatRe;
-            _CatCityRe = catCityRe;
-            _locRepository = locRepository;
-            _cateRe = cateRe;
-            _driverAges = driverAges;
-            _order = order;
+            _cr_repository = cr_repository;
+            _repository = repository;
         }
-
+        public string BuildOperationTime(List<OfficeTime> timeList, int locationId)
+        {
+            List<StdOperationTime> all = new List<StdOperationTime>();
+            var loctime = timeList.Where(n => n.LocationId == locationId).ToList();
+            foreach (EnumCarWeek log in Enum.GetValues(typeof(EnumCarWeek)))
+            {
+                all.Add(new StdOperationTime
+                {
+                    Week = log,
+                    Times = new List<StdTime> { new StdTime {
+                    Start = loctime.FirstOrDefault(n => n.DayOfWeek == (int)log).OpeningTime,
+                    End = loctime.FirstOrDefault(n => n.DayOfWeek == (int)log).ClosingTime,
+                }
+                }
+                });
+            }
+            return JsonConvert.SerializeObject(all);
+        }
         /// <summary>
         /// 构建门店
         /// </summary>
@@ -68,12 +79,16 @@ namespace HeyTripCarWeb.Supplier.BarginCar
             var (rs, str) = await BarginHttpHelper.BasePostRequest<LocationRS>(JsonConvert.SerializeObject(postModel), _setting, ApiEnum.Location);
             if (rs != null && rs.Results != null)
             {
+                List<BargainLocation> changeList = new List<BargainLocation>();
+                List<CarLocationSupplier> carLoc = new List<CarLocationSupplier>();
                 var rsLoc = rs.Results.Locations;
-                var locFilter = string.Join(",", rsLoc.Select(n => $"'{n.Location}'"));
-                var dbs = await _supplierCatRe.GetListBySqlAsync($"select * from CarRental.dbo.Car_Location_Suppliers where locationname in ({locFilter})", null);
-                var spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.BarginCar });
-                var allCity = await _CatCityRe.GetAllAsync();
-                var dbLoc = await _locRepository.GetAllAsync();
+                // var locFilter = string.Join(",", rsLoc.Select(n => $"'{n.Location}'"));
+                var supplier_re = _cr_repository.GetRepository<CarLocationSupplier>();
+                var dbs = await supplier_re.Query().Where(n => rsLoc.Select(n => n.Location).Contains(n.LocationName)).ToListAsync();
+
+                var spLoc = await supplier_re.Query().Where(n => n.Supplier == (int)EnumCarSupplier.BarginCar).ToListAsync();
+                var allCity = await _cr_repository.GetRepository<CarCity>().Query().ToListAsync();
+                var dbLoc = await _repository.GetRepository<BargainLocation>().Query().ToListAsync();
                 foreach (var r in rsLoc)
                 {
                     try
@@ -83,46 +98,75 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                         BargainLocation location = new BargainLocation();
                         if (exist != null)
                         {
-                            location = exist;
-                        }
-                        location.LocationName = r.Location;
-                        var exdb = dbs.FirstOrDefault(n => n.LocationName == r.Location && !string.IsNullOrWhiteSpace(n.Longitude));
-                        if (exdb != null)
-                        {
-                            location.CountryCode = exdb.CountryCode;
-                            location.CountryName = exdb.CountryName;
-                            location.CityName = exdb.CityName;
-                            location.CityID = exdb.CityId;
-                            location.Latitude = exdb.Latitude;
-                            location.Longitude = exdb.Longitude;
-                            location.Address = exdb.Address;
+                            exist.LocationName = r.Location;
+                            var exdb = dbs.FirstOrDefault(n => n.LocationName == r.Location && !string.IsNullOrWhiteSpace(n.Longitude));
+                            if (exdb != null)
+                            {
+                                exist.CountryCode = exdb.CountryCode;
+                                exist.CountryName = exdb.CountryName;
+                                exist.CityName = exdb.CityName;
+                                exist.CityID = exdb.CityId;
+                                exist.Latitude = exdb.Latitude;
+                                exist.Longitude = exdb.Longitude;
+                                exist.Address = exdb.Address;
 
-                            if (r.Location.Contains("Airport"))
-                            {
-                                location.Airport = true;
-                                location.AirportCode = exdb?.AirportCode;
+                                if (r.Location.Contains("Airport"))
+                                {
+                                    exist.Airport = true;
+                                    exist.AirportCode = exdb?.AirportCode;
+                                }
+                                if (r.Location == "Adelaide Airport")
+                                {
+                                    exist.AirportCode = "ADL";
+                                }
                             }
-                            if (r.Location == "Adelaide Airport")
-                            {
-                                location.AirportCode = "ADL";
-                            }
-                        }
-                        location.Telephone = r.Phone;
-                        location.OpenTime = r.OfficeOpeningTime;
-                        location.CloseTime = r.OfficeClosingTime;
-                        location.SuppLocId = r.Id.ToString();
-                        location.VendorLocId = r.Id.ToString();
-                        location.Vendor = (int)(int)EnumCarSupplier.BarginCar;
-                        location.Email = r.Email;
-                        location.UpdateTime = DateTime.Now;
-                        if (exist != null)
-                        {
-                            await _locRepository.UpdateAsync(location);
+                            exist.Telephone = r.Phone;
+                            exist.OpenTime = r.OfficeOpeningTime;
+                            exist.CloseTime = r.OfficeClosingTime;
+                            exist.SuppLocId = r.Id.ToString();
+                            exist.VendorLocId = r.Id.ToString();
+                            exist.Vendor = (int)EnumCarSupplier.BarginCar;
+                            exist.Email = r.Email;
+                            exist.UpdateTime = DateTime.Now;
+                            exist.OperationTime = BuildOperationTime(rs.Results.OfficeTimes, r.Id);
+                            changeList.Add(exist);
+                            location = exist;
                         }
                         else
                         {
+                            location.LocationName = r.Location;
+                            var exdb = dbs.FirstOrDefault(n => n.LocationName == r.Location && !string.IsNullOrWhiteSpace(n.Longitude));
+                            if (exdb != null)
+                            {
+                                location.CountryCode = exdb.CountryCode;
+                                location.CountryName = exdb.CountryName;
+                                location.CityName = exdb.CityName;
+                                location.CityID = exdb.CityId;
+                                location.Latitude = exdb.Latitude;
+                                location.Longitude = exdb.Longitude;
+                                location.Address = exdb.Address;
+
+                                if (r.Location.Contains("Airport"))
+                                {
+                                    location.Airport = true;
+                                    location.AirportCode = exdb?.AirportCode;
+                                }
+                                if (r.Location == "Adelaide Airport")
+                                {
+                                    location.AirportCode = "ADL";
+                                }
+                            }
+                            location.Telephone = r.Phone;
+                            location.OpenTime = r.OfficeOpeningTime;
+                            location.CloseTime = r.OfficeClosingTime;
+                            location.SuppLocId = r.Id.ToString();
+                            location.VendorLocId = r.Id.ToString();
+                            location.Vendor = (int)EnumCarSupplier.BarginCar;
+                            location.Email = r.Email;
+                            location.UpdateTime = DateTime.Now;
                             location.CreateTime = DateTime.Now;
-                            await _locRepository.InsertAsync(location);
+                            location.OperationTime = BuildOperationTime(rs.Results.OfficeTimes, r.Id);
+                            changeList.Add(location);
                         }
 
                         //供应商标准表
@@ -132,76 +176,95 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                         {
                             spModel = new CarLocationSupplier();
                             isadd = true;
+                            spModel.Status = 0;
                         }
                         spModel.LocationName = location.LocationName;
                         spModel.CountryCode = location.CountryCode;
+                        if (string.IsNullOrWhiteSpace(spModel.CountryCode))
+                        {
+                            spModel.CountryCode = "US";
+                        }
                         spModel.CountryName = location.CountryName;
                         spModel.CityName = location.CityName;
                         spModel.Address = location.Address;
-                        spModel.Latitude = location.Latitude.ToString();
-                        spModel.Longitude = location.Longitude.ToString();
+                        spModel.Latitude = location.Latitude?.ToString();
+                        spModel.Longitude = location.Longitude?.ToString();
                         spModel.Airport = string.IsNullOrWhiteSpace(location.AirportCode) ? false : true;
                         spModel.AirportCode = location.AirportCode;
                         spModel.StateCode = location.VendorLocId;
                         spModel.PostalCode = location.PostalCode;
                         spModel.Telephone = location.Telephone;
+                        spModel.OperationTime = location.OperationTime;
                         spModel.CityId = city == null ? 0 : city.CityId;
                         spModel.OperationTime = location.OperationTime;
-                        spModel.Supplier = ((int)EnumCarSupplier.Jucy).ToString();
+                        spModel.Supplier = (int)EnumCarSupplier.BarginCar;
                         spModel.VendorLocId = location.VendorLocId;
                         spModel.SuppLocId = location.SuppLocId;
-                        spModel.Supplier = ((int)EnumCarSupplier.BarginCar).ToString();
-                        spModel.UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                        spModel.UpdateTime = DateTime.Now;
 
                         if (isadd)
                         {
-                            spModel.CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                            await _supplierCatRe.InsertAsync(spModel);
+                            spModel.CreateTime = DateTime.Now;
                         }
-                        else
-                        {
-                            await _supplierCatRe.UpdateAsync(spModel);
-                        }
+                        carLoc.Add(spModel);
                     }
                     catch (Exception ex)
                     {
                         Log.Error($"门店更新错误{ex.Message}");
                     }
                 }
+                await _repository.GetRepository<BargainLocation>().BatchUpdateAsync(changeList.Where(n => n.LocationId > 0).ToList());
+
+                await _repository.GetRepository<BargainLocation>().BatchInsertAsync(changeList.Where(n => n.LocationId == 0 || n.LocationId == null).ToList());
+                await _cr_repository.GetRepository<CarLocationSupplier>().BatchUpdateAsync(carLoc.Where(n => n.LocationId > 0).ToList());
+
+                await _cr_repository.GetRepository<CarLocationSupplier>().BatchInsertAsync(carLoc.Where(n => n.LocationId == 0 || n.LocationId == null).ToList());
 
                 //车类型管理
-                var allcategory = await _cateRe.GetAllAsync();
+                var allcategory = await _repository.GetRepository<BarginCategoryTypes>().Query().ToListAsync();
                 foreach (var cate in rs.Results.CategoryTypes)
                 {
                     var existcate = allcategory.FirstOrDefault(n => n.CategoryTypesId == cate.Id);
-                    BarginCategoryTypes newitem = new BarginCategoryTypes()
+                    if (existcate == null)
                     {
-                        CategoryTypesId = cate.Id,
-                        DisplayOrder = cate.DisplayOrder,
-                        VehicleCategoryType = cate.VehicleCategoryType
-                    };
-                    if (existcate != null)
-                    {
-                        newitem.Id = existcate.Id;
+                        existcate = new BarginCategoryTypes()
+                        {
+                            CategoryTypesId = cate.Id,
+                            DisplayOrder = cate.DisplayOrder,
+                            VehicleCategoryType = cate.VehicleCategoryType
+                        };
+                        await _repository.GetRepository<BarginCategoryTypes>().InsertAsync(existcate);
                     }
-                    await _cateRe.InsertOrUpdate(newitem);
+                    else
+                    {
+                        existcate.CategoryTypesId = cate.Id;
+                        existcate.DisplayOrder = cate.DisplayOrder;
+                        existcate.VehicleCategoryType = cate.VehicleCategoryType;
+                        await _repository.GetRepository<BarginCategoryTypes>().UpdateAsync(existcate);
+                    }
                 }
                 //驾驶年龄插入
-                var allageSetting = await _driverAges.GetAllAsync();
+                var allageSetting = await _repository.GetRepository<BarginDriverAge>().Query().ToListAsync();
                 foreach (var age in rs.Results.DriverAges)
                 {
                     var existAge = allageSetting.FirstOrDefault(n => n.AgeId == age.Id);
-                    BarginDriverAge ageSetting = new BarginDriverAge()
+                    if (existAge == null)
                     {
-                        AgeId = age.Id,
-                        DriverAge = age.driverage,
-                        IsDefault = age.isdefault.ToString()
-                    };
-                    if (existAge != null)
-                    {
-                        ageSetting.Id = existAge.Id;
+                        existAge = new BarginDriverAge()
+                        {
+                            AgeId = age.Id,
+                            DriverAge = age.driverage,
+                            IsDefault = age.isdefault.ToString()
+                        };
+                        await _repository.GetRepository<BarginDriverAge>().InsertAsync(existAge);
                     }
-                    await _driverAges.InsertOrUpdate(ageSetting);
+                    else
+                    {
+                        existAge.AgeId = age.Id;
+                        existAge.DriverAge = age.driverage;
+                        existAge.IsDefault = age.isdefault.ToString();
+                        await _repository.GetRepository<BarginDriverAge>().UpdateAsync(existAge);
+                    }
                 }
             }
             return true;
@@ -312,13 +375,14 @@ namespace HeyTripCarWeb.Supplier.BarginCar
 
         public async Task<List<CarLocationSupplier>> GetAllLocation()
         {
-            var spLoc = await _supplierCatRe.GetListBySqlAsync("select * from CarRental.dbo.Car_Location_Suppliers where supplier =@supplier", new { supplier = (int)EnumCarSupplier.BarginCar });
+            var spLoc = await _cr_repository.GetRepository<CarLocationSupplier>().Query().Where(n => n.Supplier == (int)EnumCarSupplier.BarginCar).ToListAsync();
             return spLoc;
         }
 
         public async Task<StdCancelOrderRS> CancelOrderAsync(StdCancelOrderRQ cancelOrderRQ, int timeout = 15000)
         {
-            var dbOrder = await _order.GetByIdAsync("select * from BarginCar_Order where Reservationref=@Reservationref", new { Reservationref = cancelOrderRQ.SuppOrderId });
+            var dbOrder = await _repository.GetRepository<BarginCarOrder>().Query().FirstOrDefaultAsync(n => n.Reservationref == cancelOrderRQ.SuppOrderId);
+
             if (dbOrder == null)
             {
                 return new StdCancelOrderRS()
@@ -335,7 +399,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                 {
                     dbOrder.LastModifiy = DateTime.Now;
                     dbOrder.SuppOrderStatus = "Cancelled";
-                    await _order.UpdateAsync(dbOrder);
+                    await _repository.GetRepository<BarginCarOrder>().UpdateAsync(dbOrder);
                     return cancelOrderRes.SetSucess("订单取消成功");
                 }
                 else
@@ -410,7 +474,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                         Isonrequest = bookinginfo?.isonrequest,
                         VehiclecategorytypeId = Convert.ToInt32(extensionsInfo[0]),
                     };
-                    await _order.InsertAsync(order);
+                    await _repository.GetRepository<BarginCarOrder>().InsertAsync(order);
                 }
                 else
                 {
@@ -515,8 +579,8 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                                 LocationName = pickUp.LocationName,
                                 Latitude = pickUp.Latitude,
                                 Longitude = pickUp.Longitude,
-                                LocationId = pickUp.LocationId,
-                                CityId = pickUp.CityId,
+                                LocationId = pickUp.LocationId.Value,
+                                CityId = pickUp.CityId.HasValue ? pickUp.CityId.Value : 0,
                                 PostalCode = pickUp.PostalCode,
                                 StateCode = pickUp.StateCode,
                                 CityName = pickUp.CityName,
@@ -533,8 +597,8 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                                 LocationName = endLoc.LocationName,
                                 Latitude = endLoc.Latitude,
                                 Longitude = endLoc.Longitude,
-                                LocationId = endLoc.LocationId,
-                                CityId = endLoc.CityId,
+                                LocationId = endLoc.LocationId.Value,
+                                CityId = endLoc.CityId.HasValue ? endLoc.CityId.Value : 0,
                                 PostalCode = endLoc.PostalCode,
                                 StateCode = endLoc.StateCode,
                                 CityName = endLoc.CityName,
@@ -641,7 +705,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                                         {
                                             //usertodo
                                             //purpose = (EnumCarCoverageType)EnumCarCoverageTypeExt.GRC;
-                                            sVeh.TotalCharge.AddOtherAmount(purpose, EnumCarPayWhen.NoNeed, _currency, vc.totalfeeamount);
+                                            sVeh.TotalCharge.AddOtherAmount(purpose, EnumCarPayWhen.NoNeed, _currency, vc.totalfeeamount == null ? 0 : vc.totalfeeamount.Value);
                                         }
                                         else
                                         {
@@ -652,7 +716,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar
                                             PurposeDescription = vc.feedescription,
                                             Description = vc.name,
                                             CurrencyCode = _currency,
-                                            Amount = vc.totalfeeamount,
+                                            Amount = vc.totalfeeamount == null ? 0 : vc.totalfeeamount.Value,
                                             TaxInclusive = vc.gst,
                                             IncludedInEstTotalInd = false
                                         };
@@ -816,11 +880,11 @@ namespace HeyTripCarWeb.Supplier.BarginCar
         private async Task<int> GetSupplierAgeId(int age)
         {
             var descAge = 8;
-            var drivetype = await _driverAges.GetAllAsync();
+            var drivetype = await _repository.GetRepository<BarginDriverAge>().Query().ToListAsync();
             var dbAge = drivetype.FirstOrDefault(n => n.DriverAge == age);
             if (dbAge != null)
             {
-                descAge = dbAge.AgeId.Value;
+                descAge = Convert.ToInt32(dbAge.AgeId.Value);
             }
             return descAge;
         }
@@ -835,7 +899,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar
             List<Task> runTasks = new List<Task>();
             List<StdVehicle> res = new List<StdVehicle>();
             List<StdVehicle> sVehs = new List<StdVehicle>();
-            var allCatecory = await _cateRe.GetAllAsync();
+            var allCatecory = await _repository.GetRepository<BarginCategoryTypes>().Query().ToListAsync();
             foreach (var cate in allCatecory)
             {
                 foreach (var start in startLocList)
@@ -952,7 +1016,7 @@ namespace HeyTripCarWeb.Supplier.BarginCar
             List<StdVehicle> res = new List<StdVehicle>();
             var nowtime = DateTime.Now.AddMonths(3);
             var returntime = nowtime.AddDays(1);
-            var allCatecory = await _cateRe.GetAllAsync();
+            var allCatecory = await _repository.GetRepository<BarginCategoryTypes>().Query().ToListAsync();
             foreach (var cate in allCatecory)
             {
                 foreach (var start in locList)
